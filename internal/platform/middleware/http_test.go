@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"dogclub.local/backend/internal/platform/httpapi"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 )
@@ -25,10 +26,14 @@ func TestLoggingAndRecoveryDoNotLeakRequestOrPanic(t *testing.T) {
 	request.Header.Set("Authorization", "Bearer private_token")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, request)
-	if w.Code != http.StatusInternalServerError || w.Body.String() != "{\"error\":\"internal_error\"}\n" {
+	var problem httpapi.Problem
+	if err := json.Unmarshal(w.Body.Bytes(), &problem); err != nil {
+		t.Fatal(err)
+	}
+	if w.Code != http.StatusInternalServerError || problem.Status != w.Code || problem.Code != "internal_error" || w.Header().Get("Content-Type") != "application/problem+json" {
 		t.Fatalf("incorrect panic response: %d %s", w.Code, w.Body.String())
 	}
-	if w.Header().Get("X-Request-ID") == "" {
+	if w.Header().Get("X-Request-ID") == "" || problem.RequestID != w.Header().Get("X-Request-ID") {
 		t.Fatal("response has no request ID")
 	}
 	for _, secret := range []string{"private_path", "private_query", "private_body", "private_token", "private_panic_value"} {

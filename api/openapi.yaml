@@ -1,0 +1,202 @@
+openapi: 3.1.1
+info:
+  title: Клуб собаководства — backend
+  version: 0.3.0
+  description: |
+    Общий HTTP-контракт этапа 03. Бизнес-маршруты будут находиться под /api/v1.
+    Health отвечает application/json, включая readiness 503. Остальные ошибки
+    приложения используют RFC 9457 и application/problem+json. type=about:blank
+    описывает HTTP-статус; code уточняет причину для клиента.
+    Детали ошибок и сообщения полей — по-русски, title — стандартное имя статуса.
+    Неизвестные поля JSON отклоняются. Ожидается один объект UTF-8; стандартный
+    предел всего тела — 1048576 байт. Структура/типы: 400; размер: 413;
+    Content-Type: 415; проверка значений полей: 422.
+servers:
+  - url: http://127.0.0.1:8080
+paths:
+  /health/live:
+    get:
+      operationId: getLiveness
+      summary: Проверка работы процесса без обращения к БД
+      responses:
+        '200':
+          description: Процесс работает
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Liveness'
+              example: {status: ok}
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /health/ready:
+    get:
+      operationId: getReadiness
+      summary: Проверка соединения с PostgreSQL с коротким таймаутом
+      responses:
+        '200':
+          description: БД доступна, сервис готов
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Readiness'
+              example: {status: ready}
+        '503':
+          description: БД недоступна либо начато завершение работы
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotReady'
+              example: {status: not_ready}
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  headers:
+    RequestID:
+      description: Идентификатор запроса, совпадающий с request_id в логах и ошибке
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    NoStore:
+      required: true
+      schema:
+        type: string
+        const: no-store
+  schemas:
+    Liveness:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: {type: string, const: ok}
+    Readiness:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: {type: string, const: ready}
+    NotReady:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: {type: string, const: not_ready}
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [field, code, message]
+      properties:
+        field:
+          type: string
+          minLength: 1
+          description: JSON-имя поля, для вложенных полей — запись через точку
+        code:
+          type: string
+          minLength: 1
+        message:
+          type: string
+          minLength: 1
+          description: Безопасное сообщение без переданного пользователем значения
+    Problem:
+      type: object
+      required: [type, title, status, code, request_id]
+      properties:
+        type:
+          type: string
+          const: about:blank
+        title:
+          type: string
+          minLength: 1
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          enum: [invalid_json, body_too_large, unsupported_media_type, validation_failed, not_found, method_not_allowed, internal_error]
+        detail:
+          type: string
+          description: Безопасное описание ошибки без внутренних технических деталей
+        request_id:
+          type: string
+          minLength: 1
+        errors:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/FieldError'
+      example:
+        type: about:blank
+        title: Unprocessable Entity
+        status: 422
+        code: validation_failed
+        detail: Проверьте значения полей.
+        request_id: example-request-id
+        errors:
+          - field: name
+            code: required
+            message: Укажите имя.
+  responses:
+    BadRequest:
+      description: Некорректный JSON, неизвестные поля или неверные типы значений
+      headers: &problemHeaders
+        X-Request-ID:
+          $ref: '#/components/headers/RequestID'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content: &problemContent
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    BodyTooLarge:
+      description: Превышен допустимый размер тела запроса
+      headers: *problemHeaders
+      content: *problemContent
+    UnsupportedMediaType:
+      description: Ожидается application/json в UTF-8
+      headers: *problemHeaders
+      content: *problemContent
+    ValidationFailed:
+      description: Некорректные значения полей; подробности в errors
+      headers: *problemHeaders
+      content: *problemContent
+    NotFound:
+      description: Ресурс или маршрут не найден
+      headers: *problemHeaders
+      content: *problemContent
+    MethodNotAllowed:
+      description: Метод не поддерживается для этого маршрута
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestID'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+        Allow:
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      content: *problemContent
+    InternalError:
+      description: Внутренняя ошибка, подробности клиенту не раскрываются
+      headers: *problemHeaders
+      content: *problemContent

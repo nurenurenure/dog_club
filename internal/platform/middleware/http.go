@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"dogclub.local/backend/internal/platform/httpapi"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 )
@@ -50,9 +51,7 @@ func Recover(logger *slog.Logger) func(http.Handler) http.Handler {
 					if wrapped, ok := w.(chimiddleware.WrapResponseWriter); ok && wrapped.Status() != 0 {
 						panic(http.ErrAbortHandler)
 					}
-					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusInternalServerError)
-					_, _ = w.Write([]byte("{\"error\":\"internal_error\"}\n"))
+					httpapi.InternalServerError(w, r)
 				}
 			}()
 			next.ServeHTTP(w, r)

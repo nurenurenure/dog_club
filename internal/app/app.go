@@ -11,6 +11,7 @@ import (
 	"dogclub.local/backend/internal/health"
 	"dogclub.local/backend/internal/platform/config"
 	"dogclub.local/backend/internal/platform/database"
+	"dogclub.local/backend/internal/platform/httpapi"
 	"dogclub.local/backend/internal/platform/middleware"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -38,6 +39,8 @@ func newApp(cfg config.Config, logger *slog.Logger, ping func(context.Context) e
 	router.Use(chimiddleware.RequestID)
 	router.Use(middleware.RequestLog(logger))
 	router.Use(middleware.Recover(logger))
+	router.NotFound(httpapi.NotFound)
+	router.MethodNotAllowed(httpapi.MethodNotAllowed(router))
 	router.Get("/health/live", h.Live)
 	router.Get("/health/ready", h.Ready)
 	return &App{

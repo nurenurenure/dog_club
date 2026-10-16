@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"sync/atomic"
 	"time"
+
+	"dogclub.local/backend/internal/platform/httpapi"
 )
 
 type Handler struct {
@@ -40,8 +42,8 @@ func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
 }
 
 func respond(w http.ResponseWriter, code int, status string) {
-	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(code)
-	_, _ = w.Write([]byte(`{"status":"` + status + `"}` + "\n"))
+	httpapi.WriteJSON(w, code, struct {
+		Status string `json:"status"`
+	}{Status: status})
 }
