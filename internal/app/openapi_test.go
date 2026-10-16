@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"dogclub.local/backend/internal/auth"
+
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers"
@@ -25,7 +27,7 @@ func TestRoutesAndResponsesMatchOpenAPI(t *testing.T) {
 			return errors.New("private_database_error")
 		}
 		return nil
-	}, func() {})
+	}, func() {}, auth.NewHandler(nil, false))
 	mux := a.server.Handler.(*chi.Mux)
 	var routes int
 	if err := chi.Walk(mux, func(method, path string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {

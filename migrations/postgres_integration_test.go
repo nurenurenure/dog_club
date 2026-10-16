@@ -32,7 +32,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if err := Run(ctx, "status", url, &output); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(output.String(), "pending") != 2 || scalar(t, ctx, conn,
+	if strings.Count(output.String(), "pending") != 3 || scalar(t, ctx, conn,
 		`SELECT count(*) FROM pg_tables WHERE schemaname='public'`) != 0 {
 		t.Fatal("status on an empty database must list pending migrations without creating tables")
 	}
@@ -46,19 +46,19 @@ func TestPostgresMigrations(t *testing.T) {
 			t.Fatalf("unexpected migration result: %q", output.String())
 		}
 	}
-	apply("applied 2 migration(s)\n")
-	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 34 {
-		t.Fatalf("expected 33 application tables and Goose history, got %d", count)
+	apply("applied 3 migration(s)\n")
+	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 41 {
+		t.Fatalf("expected 40 application tables and Goose history, got %d", count)
 	}
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_constraint c JOIN pg_namespace n
-		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 37 {
-		t.Fatalf("expected all 31 original and 6 new FK, got %d", count)
+		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 49 {
+		t.Fatalf("expected 37 domain and 12 auth FK, got %d", count)
 	}
 	checkSeeds(t, ctx, conn)
 	apply("applied 0 migration(s)\n")
 	output.Reset()
-	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 2 {
-		t.Fatalf("expected two applied versions: %v %q", err, output.String())
+	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 3 {
+		t.Fatalf("expected three applied versions: %v %q", err, output.String())
 	}
 
 	t.Run("constraints and deletion policies", func(t *testing.T) {
@@ -136,6 +136,9 @@ func TestPostgresMigrations(t *testing.T) {
 			var id int
 			query := fmt.Sprintf("INSERT INTO %s (%s) VALUES ($1) RETURNING %s",
 				pgx.Identifier{table}.Sanitize(), pgx.Identifier{table + "_name"}.Sanitize(), pgx.Identifier{table + "_id"}.Sanitize())
+			if table == "role" {
+				query = `INSERT INTO role(role_name,code) VALUES($1,'test_role') RETURNING role_id`
+			}
 			if err := tx.QueryRow(ctx, query, "Тест").Scan(&id); err != nil || id <= count {
 				t.Fatalf("sequence for %s: id=%d, error=%v", table, id, err)
 			}
@@ -143,6 +146,15 @@ func TestPostgresMigrations(t *testing.T) {
 	})
 
 	t.Run("referenced seeds prevent partial rollback", func(t *testing.T) {
+		// Roll back auth in this isolated database before attempting the seed down.
+		if err := Run(ctx, "down", url, io.Discard); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := Run(ctx, "up", url, io.Discard); err != nil {
+				t.Error(err)
+			}
+		}()
 		if _, err := conn.Exec(ctx, `INSERT INTO club_member (club_member_id,club_member_full_name,role_id,membership_status_id)
 			VALUES (2001,'Тест защиты отката',1,1)`); err != nil {
 			t.Fatal(err)
@@ -155,7 +167,7 @@ func TestPostgresMigrations(t *testing.T) {
 		checkSeeds(t, ctx, conn)
 	})
 
-	for range 2 {
+	for range 3 {
 		if err := Run(ctx, "down", url, io.Discard); err != nil {
 			t.Fatal(err)
 		}
@@ -163,7 +175,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 1 {
 		t.Fatalf("full rollback must leave only Goose history, got %d tables", count)
 	}
-	apply("applied 2 migration(s)\n")
+	apply("applied 3 migration(s)\n")
 	checkSeeds(t, ctx, conn)
 }
 

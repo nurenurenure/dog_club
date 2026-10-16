@@ -8,10 +8,12 @@ import (
 	"net"
 	"net/http"
 
+	"dogclub.local/backend/internal/auth"
 	"dogclub.local/backend/internal/health"
 	"dogclub.local/backend/internal/platform/config"
 	"dogclub.local/backend/internal/platform/database"
 	"dogclub.local/backend/internal/platform/httpapi"
+	"dogclub.local/backend/internal/platform/mail"
 	"dogclub.local/backend/internal/platform/middleware"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -30,10 +32,20 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newApp(cfg, logger, pool.Ping, pool.Close), nil
+	mailer, err := mail.NewLocalSMTP(cfg.SMTPAddr, cfg.MailFrom)
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
+	service, err := auth.NewService(auth.NewRepository(pool), mailer, auth.Options{JWTKey: cfg.JWTKey, Issuer: cfg.JWTIssuer, Audience: cfg.JWTAudience, IOTimeout: cfg.AuthIOTimeout})
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
+	return newApp(cfg, logger, pool.Ping, pool.Close, auth.NewHandler(service, cfg.CookieSecure)), nil
 }
 
-func newApp(cfg config.Config, logger *slog.Logger, ping func(context.Context) error, closePool func()) *App {
+func newApp(cfg config.Config, logger *slog.Logger, ping func(context.Context) error, closePool func(), authHandlers ...*auth.Handler) *App {
 	h := health.New(ping, cfg.DBPingTimeout)
 	router := chi.NewRouter()
 	router.Use(chimiddleware.RequestID)
@@ -43,6 +55,9 @@ func newApp(cfg config.Config, logger *slog.Logger, ping func(context.Context) e
 	router.MethodNotAllowed(httpapi.MethodNotAllowed(router))
 	router.Get("/health/live", h.Live)
 	router.Get("/health/ready", h.Ready)
+	for _, h := range authHandlers {
+		h.Register(router)
+	}
 	return &App{
 		cfg: cfg, logger: logger, health: h, closePool: closePool,
 		server: &http.Server{

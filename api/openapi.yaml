@@ -1,202 +1,1353 @@
-openapi: 3.1.1
-info:
-  title: Клуб собаководства — backend
-  version: 0.3.0
-  description: |
-    Общий HTTP-контракт этапа 03. Бизнес-маршруты будут находиться под /api/v1.
-    Health отвечает application/json, включая readiness 503. Остальные ошибки
-    приложения используют RFC 9457 и application/problem+json. type=about:blank
-    описывает HTTP-статус; code уточняет причину для клиента.
-    Детали ошибок и сообщения полей — по-русски, title — стандартное имя статуса.
-    Неизвестные поля JSON отклоняются. Ожидается один объект UTF-8; стандартный
-    предел всего тела — 1048576 байт. Структура/типы: 400; размер: 413;
-    Content-Type: 415; проверка значений полей: 422.
-servers:
-  - url: http://127.0.0.1:8080
-paths:
-  /health/live:
-    get:
-      operationId: getLiveness
-      summary: Проверка работы процесса без обращения к БД
-      responses:
-        '200':
-          description: Процесс работает
-          headers:
-            X-Request-ID:
-              $ref: '#/components/headers/RequestID'
-            Cache-Control:
-              $ref: '#/components/headers/NoStore'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Liveness'
-              example: {status: ok}
-        '405':
-          $ref: '#/components/responses/MethodNotAllowed'
-        '500':
-          $ref: '#/components/responses/InternalError'
-  /health/ready:
-    get:
-      operationId: getReadiness
-      summary: Проверка соединения с PostgreSQL с коротким таймаутом
-      responses:
-        '200':
-          description: БД доступна, сервис готов
-          headers:
-            X-Request-ID:
-              $ref: '#/components/headers/RequestID'
-            Cache-Control:
-              $ref: '#/components/headers/NoStore'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Readiness'
-              example: {status: ready}
-        '503':
-          description: БД недоступна либо начато завершение работы
-          headers:
-            X-Request-ID:
-              $ref: '#/components/headers/RequestID'
-            Cache-Control:
-              $ref: '#/components/headers/NoStore'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NotReady'
-              example: {status: not_ready}
-        '405':
-          $ref: '#/components/responses/MethodNotAllowed'
-        '500':
-          $ref: '#/components/responses/InternalError'
 components:
-  headers:
-    RequestID:
-      description: Идентификатор запроса, совпадающий с request_id в логах и ошибке
-      required: true
-      schema:
-        type: string
-        minLength: 1
-    NoStore:
-      required: true
-      schema:
-        type: string
-        const: no-store
-  schemas:
-    Liveness:
-      type: object
-      additionalProperties: false
-      required: [status]
-      properties:
-        status: {type: string, const: ok}
-    Readiness:
-      type: object
-      additionalProperties: false
-      required: [status]
-      properties:
-        status: {type: string, const: ready}
-    NotReady:
-      type: object
-      additionalProperties: false
-      required: [status]
-      properties:
-        status: {type: string, const: not_ready}
-    FieldError:
-      type: object
-      additionalProperties: false
-      required: [field, code, message]
-      properties:
-        field:
-          type: string
-          minLength: 1
-          description: JSON-имя поля, для вложенных полей — запись через точку
-        code:
-          type: string
-          minLength: 1
-        message:
-          type: string
-          minLength: 1
-          description: Безопасное сообщение без переданного пользователем значения
-    Problem:
-      type: object
-      required: [type, title, status, code, request_id]
-      properties:
-        type:
-          type: string
-          const: about:blank
-        title:
-          type: string
-          minLength: 1
-        status:
-          type: integer
-          minimum: 400
-          maximum: 599
-        code:
-          type: string
-          enum: [invalid_json, body_too_large, unsupported_media_type, validation_failed, not_found, method_not_allowed, internal_error]
-        detail:
-          type: string
-          description: Безопасное описание ошибки без внутренних технических деталей
-        request_id:
-          type: string
-          minLength: 1
-        errors:
-          type: array
-          minItems: 1
-          items:
-            $ref: '#/components/schemas/FieldError'
-      example:
-        type: about:blank
-        title: Unprocessable Entity
-        status: 422
-        code: validation_failed
-        detail: Проверьте значения полей.
-        request_id: example-request-id
-        errors:
-          - field: name
-            code: required
-            message: Укажите имя.
-  responses:
-    BadRequest:
-      description: Некорректный JSON, неизвестные поля или неверные типы значений
-      headers: &problemHeaders
-        X-Request-ID:
-          $ref: '#/components/headers/RequestID'
-        Cache-Control:
-          $ref: '#/components/headers/NoStore'
-      content: &problemContent
-        application/problem+json:
-          schema:
-            $ref: '#/components/schemas/Problem'
-    BodyTooLarge:
-      description: Превышен допустимый размер тела запроса
-      headers: *problemHeaders
-      content: *problemContent
-    UnsupportedMediaType:
-      description: Ожидается application/json в UTF-8
-      headers: *problemHeaders
-      content: *problemContent
-    ValidationFailed:
-      description: Некорректные значения полей; подробности в errors
-      headers: *problemHeaders
-      content: *problemContent
-    NotFound:
-      description: Ресурс или маршрут не найден
-      headers: *problemHeaders
-      content: *problemContent
-    MethodNotAllowed:
-      description: Метод не поддерживается для этого маршрута
-      headers:
-        X-Request-ID:
-          $ref: '#/components/headers/RequestID'
-        Cache-Control:
-          $ref: '#/components/headers/NoStore'
-        Allow:
-          required: true
-          schema:
-            type: string
-            minLength: 1
-      content: *problemContent
-    InternalError:
-      description: Внутренняя ошибка, подробности клиенту не раскрываются
-      headers: *problemHeaders
-      content: *problemContent
+    headers:
+        NoStore:
+            required: true
+            schema:
+                const: no-store
+                type: string
+        RequestID:
+            description: Идентификатор запроса, совпадающий с request_id в логах и ошибке
+            required: true
+            schema:
+                minLength: 1
+                type: string
+    responses:
+        AuthBadToken:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Одноразовый код недействителен, использован или просрочен
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        AuthConflict:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Дубликат, несовместимое состояние или попытка отключить последнего администратора
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        AuthForbidden:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Профиль отключён, не выбран для операции, не принадлежит пользователю либо запрещён источник браузерного запроса
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        AuthRateLimited:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Превышен лимит попыток или заняты слоты проверки пароля
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                Retry-After:
+                    required: true
+                    schema:
+                        type: string
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        AuthUnauthorized:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Неверные учётные данные, недействительный JWT или отозванная сессия
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                WWW-Authenticate:
+                    required: true
+                    schema:
+                        type: string
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        AuthUnavailable:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: PostgreSQL или отправка почты недоступны; при отказе почты приглашение сохранено. Location указывает маршрут повторной отправки
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                Location:
+                    schema:
+                        type: string
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        BadRequest:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Некорректный JSON, неизвестные поля, неверные типы значений либо недействительный одноразовый код активации/восстановления
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        BodyTooLarge:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Превышен допустимый размер тела запроса
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        InternalError:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Внутренняя ошибка, подробности клиенту не раскрываются
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        MethodNotAllowed:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Метод не поддерживается для этого маршрута
+            headers:
+                Allow:
+                    required: true
+                    schema:
+                        minLength: 1
+                        type: string
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        NotFound:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Ресурс или маршрут не найден
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        UnsupportedMediaType:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Ожидается application/json в UTF-8
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        ValidationFailed:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Некорректные значения полей; массив errors может содержать подробности
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+    schemas:
+        ActivateInput:
+            additionalProperties: false
+            properties:
+                password:
+                    description: Не менее 15 символов, не более 1024 байт UTF-8
+                    maxLength: 1024
+                    minLength: 15
+                    type: string
+                    writeOnly: true
+                token:
+                    maxLength: 43
+                    minLength: 43
+                    pattern: ^[A-Za-z0-9_-]{43}$
+                    type: string
+                    writeOnly: true
+            required:
+                - token
+                - password
+            type: object
+        BlockedInput:
+            additionalProperties: false
+            properties:
+                blocked:
+                    type: boolean
+            required:
+                - blocked
+            type: object
+        ChangePasswordInput:
+            additionalProperties: false
+            properties:
+                current_password:
+                    maxLength: 1024
+                    type: string
+                    writeOnly: true
+                password:
+                    description: Не менее 15 символов, не более 1024 байт UTF-8
+                    maxLength: 1024
+                    minLength: 15
+                    type: string
+                    writeOnly: true
+            required:
+                - current_password
+                - password
+            type: object
+        Credentials:
+            additionalProperties: false
+            properties:
+                access_token:
+                    type: string
+                expires_in:
+                    const: 600
+                    type: integer
+                profile:
+                    $ref: '#/components/schemas/Profile'
+                token_type:
+                    const: Bearer
+                    type: string
+                user:
+                    $ref: '#/components/schemas/User'
+            required:
+                - access_token
+                - token_type
+                - expires_in
+                - user
+                - profile
+            type: object
+        EnabledInput:
+            additionalProperties: false
+            properties:
+                enabled:
+                    type: boolean
+            required:
+                - enabled
+            type: object
+        FieldError:
+            additionalProperties: false
+            properties:
+                code:
+                    minLength: 1
+                    type: string
+                field:
+                    description: JSON-имя поля, для вложенных полей — запись через точку
+                    minLength: 1
+                    type: string
+                message:
+                    description: Безопасное сообщение без переданного пользователем значения
+                    minLength: 1
+                    type: string
+            required:
+                - field
+                - code
+                - message
+            type: object
+        ForgotInput:
+            additionalProperties: false
+            properties:
+                login:
+                    type: string
+            required:
+                - login
+            type: object
+        Invitation:
+            additionalProperties: false
+            properties:
+                expires_at:
+                    format: date-time
+                    type: string
+                id:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+                user_id:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+            required:
+                - id
+                - user_id
+                - expires_at
+            type: object
+        InviteInput:
+            additionalProperties: false
+            properties:
+                club_member_id:
+                    minimum: 1
+                    type: integer
+                email:
+                    format: email
+                    maxLength: 254
+                    type: string
+                login:
+                    pattern: ^[a-z0-9][a-z0-9._-]{2,63}$
+                    type: string
+                role:
+                    enum:
+                        - admin
+                        - staff
+                        - veterinarian
+                        - expert
+                        - owner
+                        - leader
+                    type: string
+            required:
+                - login
+                - email
+                - role
+            type: object
+        Liveness:
+            additionalProperties: false
+            properties:
+                status:
+                    const: ok
+                    type: string
+            required:
+                - status
+            type: object
+        LoginInput:
+            additionalProperties: false
+            properties:
+                login:
+                    type: string
+                password:
+                    maxLength: 1024
+                    type: string
+                    writeOnly: true
+                profile_id:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+            required:
+                - login
+                - password
+            type: object
+        Message:
+            additionalProperties: false
+            properties:
+                message:
+                    type: string
+            required:
+                - message
+            type: object
+        NotReady:
+            additionalProperties: false
+            properties:
+                status:
+                    const: not_ready
+                    type: string
+            required:
+                - status
+            type: object
+        Principal:
+            additionalProperties: false
+            properties:
+                profile:
+                    $ref: '#/components/schemas/Profile'
+                user:
+                    $ref: '#/components/schemas/User'
+            required:
+                - user
+                - profile
+            type: object
+        Problem:
+            example:
+                code: validation_failed
+                detail: Проверьте значения полей.
+                errors:
+                    - code: required
+                      field: name
+                      message: Укажите имя.
+                request_id: example-request-id
+                status: 422
+                title: Unprocessable Entity
+                type: about:blank
+            properties:
+                code:
+                    enum:
+                        - invalid_json
+                        - body_too_large
+                        - unsupported_media_type
+                        - validation_failed
+                        - not_found
+                        - method_not_allowed
+                        - internal_error
+                        - unauthenticated
+                        - forbidden
+                        - invalid_token
+                        - account_conflict
+                        - last_admin
+                        - auth_unavailable
+                        - mail_unavailable
+                        - rate_limited
+                    type: string
+                detail:
+                    description: Безопасное описание ошибки без внутренних технических деталей
+                    type: string
+                errors:
+                    items:
+                        $ref: '#/components/schemas/FieldError'
+                    minItems: 1
+                    type: array
+                request_id:
+                    minLength: 1
+                    type: string
+                status:
+                    maximum: 599
+                    minimum: 400
+                    type: integer
+                title:
+                    minLength: 1
+                    type: string
+                type:
+                    const: about:blank
+                    type: string
+            required:
+                - type
+                - title
+                - status
+                - code
+                - request_id
+            type: object
+        Profile:
+            additionalProperties: false
+            properties:
+                enabled:
+                    type: boolean
+                id:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+                role:
+                    enum:
+                        - admin
+                        - staff
+                        - veterinarian
+                        - expert
+                        - owner
+                        - leader
+                    type: string
+            required:
+                - id
+                - role
+                - enabled
+            type: object
+        Profiles:
+            additionalProperties: false
+            properties:
+                profiles:
+                    items:
+                        $ref: '#/components/schemas/Profile'
+                    type: array
+            required:
+                - profiles
+            type: object
+        Readiness:
+            additionalProperties: false
+            properties:
+                status:
+                    const: ready
+                    type: string
+            required:
+                - status
+            type: object
+        RoleInput:
+            additionalProperties: false
+            properties:
+                role:
+                    enum:
+                        - admin
+                        - staff
+                        - veterinarian
+                        - expert
+                        - owner
+                        - leader
+                    type: string
+            required:
+                - role
+            type: object
+        SwitchInput:
+            additionalProperties: false
+            properties:
+                profile_id:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+            required:
+                - profile_id
+            type: object
+        User:
+            additionalProperties: false
+            properties:
+                club_member_id:
+                    minimum: 1
+                    type: integer
+                created_at:
+                    format: date-time
+                    type: string
+                email:
+                    format: email
+                    type: string
+                email_verified_at:
+                    format: date-time
+                    type: string
+                id:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+                login:
+                    type: string
+                status:
+                    enum:
+                        - invited
+                        - active
+                        - blocked
+                    type: string
+            required:
+                - id
+                - login
+                - email
+                - status
+                - created_at
+            type: object
+        Users:
+            additionalProperties: false
+            properties:
+                users:
+                    items:
+                        $ref: '#/components/schemas/User'
+                    maxItems: 100
+                    type: array
+            required:
+                - users
+            type: object
+    securitySchemes:
+        bearerAuth:
+            bearerFormat: JWT
+            scheme: bearer
+            type: http
+        refreshCookie:
+            in: cookie
+            name: dogclub_refresh
+            type: apiKey
+info:
+    description: 'Этап 04: приглашения администратора, единая учётная запись и переключаемые профили. Активен один профиль на сессию; права не объединяются. Авторизация: Bearer access JWT (10 минут), refresh в HttpOnly cookie (7 дней, ротация), состояние PostgreSQL проверяется при запросах. При отключённом профиле доступны собственные me/profiles/switch-profile/logout/change-password; административные и предметные операции запрещены. Auth JSON ограничен 16384 байтами. Почта только локальная (Mailpit). Поле club_member.role_id не предоставляет права доступа. Ошибки RFC 9457; health, включая readiness 503, сохраняет application/json. Браузерные изменяющие запросы проверяются CrossOriginProtection; будущий React использует один origin/прокси API.'
+    title: Клуб собаководства — backend
+    version: 0.4.0
+openapi: 3.1.1
+paths:
+    /api/v1/auth/activate:
+        post:
+            operationId: activateAccount
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ActivateInput'
+                required: true
+            responses:
+                "204":
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            summary: Подтверждение приглашения и установка пароля
+    /api/v1/auth/change-password:
+        post:
+            operationId: changePassword
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ChangePasswordInput'
+                required: true
+            responses:
+                "204":
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Смена пароля отзывает все сессии и коды восстановления
+    /api/v1/auth/forgot-password:
+        post:
+            operationId: requestPasswordReset
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ForgotInput'
+                required: true
+            responses:
+                "202":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Message'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            summary: Запрос восстановления; одинаковый ответ для существующего и неизвестного логина
+    /api/v1/auth/login:
+        post:
+            operationId: login
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/LoginInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Credentials'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Set-Cookie:
+                            description: Refresh-токен только в HttpOnly cookie, Path=/api/v1/auth, SameSite=Strict; Secure в HTTPS. В JSON refresh не возвращается.
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            summary: Вход; profile_id необязателен, по умолчанию первый доступный профиль по коду роли
+    /api/v1/auth/logout:
+        post:
+            operationId: logoutSession
+            responses:
+                "204":
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Отзыв текущей сессии и удаление refresh cookie
+    /api/v1/auth/me:
+        get:
+            operationId: getCurrentAccount
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Principal'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Учётная запись и текущий профиль, включая состояние enabled
+    /api/v1/auth/profiles:
+        get:
+            operationId: listOwnProfiles
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Profiles'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Свои профили, включая отключённые
+    /api/v1/auth/refresh:
+        post:
+            operationId: refreshSession
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Credentials'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Set-Cookie:
+                            description: Refresh-токен только в HttpOnly cookie, Path=/api/v1/auth, SameSite=Strict; Secure в HTTPS. В JSON refresh не возвращается.
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - refreshCookie: []
+            summary: Ротация refresh и выдача access; повторное использование старого refresh отзывает сессию
+    /api/v1/auth/reset-password:
+        post:
+            operationId: resetPassword
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ActivateInput'
+                required: true
+            responses:
+                "204":
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            summary: Установка пароля по одноразовому коду; все сессии отзываются
+    /api/v1/auth/switch-profile:
+        post:
+            operationId: switchProfile
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SwitchInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Credentials'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Смена профиля этой сессии и отказ старым access JWT; refresh cookie сохраняется
+    /api/v1/invitations:
+        post:
+            description: Требуется действующий активный профиль admin; другие назначенные профили не дают этих прав.
+            operationId: inviteAccount
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/InviteInput'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Invitation'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/AuthConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Создание учётной записи и приглашение с первым профилем
+    /api/v1/invitations/{invitationID}:
+        delete:
+            description: Требуется действующий активный профиль admin; другие назначенные профили не дают этих прав.
+            operationId: cancelInvitation
+            parameters:
+                - in: path
+                  name: invitationID
+                  required: true
+                  schema:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+            responses:
+                "204":
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/AuthConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Отмена неиспользованного приглашения
+    /api/v1/invitations/{invitationID}/resend:
+        post:
+            description: Требуется действующий активный профиль admin; другие назначенные профили не дают этих прав.
+            operationId: resendInvitation
+            parameters:
+                - in: path
+                  name: invitationID
+                  required: true
+                  schema:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Invitation'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/AuthConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Новый код на 48 часов, прежнее приглашение отменяется
+    /api/v1/users:
+        get:
+            description: Требуется действующий активный профиль admin; другие назначенные профили не дают этих прав.
+            operationId: listAccounts
+            parameters:
+                - in: query
+                  name: after
+                  schema:
+                    maxLength: 64
+                    type: string
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Users'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/AuthConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Учётные записи, страницы до 100 записей
+    /api/v1/users/{userID}:
+        patch:
+            description: Требуется действующий активный профиль admin; другие назначенные профили не дают этих прав.
+            operationId: setAccountBlocked
+            parameters:
+                - in: path
+                  name: userID
+                  required: true
+                  schema:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/BlockedInput'
+                required: true
+            responses:
+                "204":
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/AuthConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Блокировка/разблокировка; старые сессии не восстанавливаются
+    /api/v1/users/{userID}/profiles:
+        post:
+            description: Требуется действующий активный профиль admin; другие назначенные профили не дают этих прав.
+            operationId: assignProfile
+            parameters:
+                - in: path
+                  name: userID
+                  required: true
+                  schema:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/RoleInput'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Profile'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/AuthConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Назначение одного профиля указанной роли; без дубликатов
+    /api/v1/users/{userID}/profiles/{profileID}:
+        patch:
+            description: Требуется действующий активный профиль admin; другие назначенные профили не дают этих прав.
+            operationId: setProfileEnabled
+            parameters:
+                - in: path
+                  name: userID
+                  required: true
+                  schema:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+                - in: path
+                  name: profileID
+                  required: true
+                  schema:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EnabledInput'
+                required: true
+            responses:
+                "204":
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/AuthConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Включение/отключение профиля с изменением версии доступа
+    /health/live:
+        get:
+            operationId: getLiveness
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            example:
+                                status: ok
+                            schema:
+                                $ref: '#/components/schemas/Liveness'
+                    description: Процесс работает
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "405":
+                    $ref: '#/components/responses/MethodNotAllowed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+            summary: Проверка работы процесса без обращения к БД
+    /health/ready:
+        get:
+            operationId: getReadiness
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            example:
+                                status: ready
+                            schema:
+                                $ref: '#/components/schemas/Readiness'
+                    description: БД доступна, сервис готов
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "405":
+                    $ref: '#/components/responses/MethodNotAllowed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    content:
+                        application/json:
+                            example:
+                                status: not_ready
+                            schema:
+                                $ref: '#/components/schemas/NotReady'
+                    description: БД недоступна либо начато завершение работы
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+            summary: Проверка соединения с PostgreSQL с коротким таймаутом
+servers:
+    - url: http://127.0.0.1:8080
