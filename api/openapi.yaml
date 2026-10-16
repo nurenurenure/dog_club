@@ -122,6 +122,28 @@ components:
                     $ref: '#/components/headers/NoStore'
                 X-Request-ID:
                     $ref: '#/components/headers/RequestID'
+        MemberConflict:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Версия карточки устарела либо адрес используется мероприятием. При ошибке данные и история не меняются.
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        MembersUnavailable:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Сервис карточек временно недоступен.
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
         MethodNotAllowed:
             content:
                 application/problem+json:
@@ -190,6 +212,16 @@ components:
             required:
                 - token
                 - password
+            type: object
+        BindMemberInput:
+            additionalProperties: false
+            properties:
+                member_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+            required:
+                - member_id
             type: object
         BlockedInput:
             additionalProperties: false
@@ -345,6 +377,364 @@ components:
                 - login
                 - password
             type: object
+        Member:
+            additionalProperties: false
+            properties:
+                addresses:
+                    items:
+                        $ref: '#/components/schemas/MemberAddress'
+                    type: array
+                contacts:
+                    items:
+                        $ref: '#/components/schemas/MemberContact'
+                    type: array
+                date_of_birth:
+                    description: Дата YYYY-MM-DD, не позднее текущей даты UTC; null означает отсутствие даты.
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                full_name:
+                    maxLength: 150
+                    minLength: 1
+                    type: string
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                membership_date:
+                    description: Дата YYYY-MM-DD, не позднее текущей даты UTC; null означает отсутствие даты.
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                membership_status:
+                    $ref: '#/components/schemas/MemberDictionary'
+                version:
+                    description: Текущая версия всей карточки. Все изменения карточки, контактов и адресов увеличивают её на один.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - full_name
+                - date_of_birth
+                - membership_date
+                - membership_status
+                - version
+                - contacts
+                - addresses
+            type: object
+        MemberAddress:
+            additionalProperties: false
+            properties:
+                apartment_number:
+                    maxLength: 20
+                    type: string
+                building_number:
+                    maxLength: 20
+                    type: string
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                locality:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                street:
+                    maxLength: 100
+                    type: string
+                type:
+                    $ref: '#/components/schemas/MemberDictionary'
+            required:
+                - id
+                - type
+                - locality
+                - street
+                - building_number
+                - apartment_number
+            type: object
+        MemberAddressInput:
+            additionalProperties: false
+            properties:
+                apartment_number:
+                    maxLength: 20
+                    type: string
+                building_number:
+                    maxLength: 20
+                    type: string
+                locality:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                street:
+                    maxLength: 100
+                    type: string
+                type_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                version:
+                    description: Текущая версия всей карточки. Все изменения карточки, контактов и адресов увеличивают её на один.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - type_id
+                - locality
+            type: object
+        MemberChange:
+            additionalProperties: false
+            properties:
+                action:
+                    enum:
+                        - member_created
+                        - member_updated
+                        - contact_saved
+                        - contact_deleted
+                        - address_saved
+                        - address_deleted
+                    type: string
+                actor_profile_id:
+                    type: string
+                actor_role:
+                    type: string
+                actor_user_id:
+                    type: string
+                after:
+                    $ref: '#/components/schemas/Member'
+                before:
+                    anyOf:
+                        - $ref: '#/components/schemas/Member'
+                        - type: "null"
+                changed_at:
+                    format: date-time
+                    type: string
+                id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                request_id:
+                    type: string
+            required:
+                - id
+                - actor_user_id
+                - actor_profile_id
+                - actor_role
+                - action
+                - before
+                - after
+                - request_id
+                - changed_at
+            type: object
+        MemberContact:
+            additionalProperties: false
+            properties:
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                type:
+                    $ref: '#/components/schemas/MemberDictionary'
+                value:
+                    maxLength: 254
+                    type: string
+            required:
+                - id
+                - type
+                - value
+            type: object
+        MemberContactInput:
+            additionalProperties: false
+            properties:
+                type_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                value:
+                    description: 'Телефон: 7–15 цифр, до 50 байт с форматированием, без подстановки кода страны. Email: до 254 байт, без имени получателя.'
+                    maxLength: 254
+                    minLength: 1
+                    type: string
+                version:
+                    description: Текущая версия всей карточки. Все изменения карточки, контактов и адресов увеличивают её на один.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - type_id
+                - value
+            type: object
+        MemberCreateInput:
+            additionalProperties: false
+            properties:
+                date_of_birth:
+                    description: Дата YYYY-MM-DD, не позднее текущей даты UTC; null означает отсутствие даты.
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                full_name:
+                    maxLength: 150
+                    minLength: 1
+                    type: string
+                membership_date:
+                    description: Дата YYYY-MM-DD, не позднее текущей даты UTC; null означает отсутствие даты.
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                membership_status_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+            required:
+                - full_name
+                - membership_status_id
+            type: object
+        MemberDictionaries:
+            additionalProperties: false
+            properties:
+                address_types:
+                    items:
+                        $ref: '#/components/schemas/MemberDictionary'
+                    type: array
+                contact_types:
+                    items:
+                        $ref: '#/components/schemas/MemberDictionary'
+                    type: array
+                membership_statuses:
+                    items:
+                        $ref: '#/components/schemas/MemberDictionary'
+                    type: array
+            required:
+                - membership_statuses
+                - contact_types
+                - address_types
+            type: object
+        MemberDictionary:
+            additionalProperties: false
+            properties:
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                name:
+                    type: string
+            required:
+                - id
+                - name
+            type: object
+        MemberHistoryPage:
+            additionalProperties: false
+            properties:
+                changes:
+                    items:
+                        $ref: '#/components/schemas/MemberChange'
+                    maxItems: 100
+                    type: array
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+            required:
+                - changes
+                - next_after
+            type: object
+        MemberPage:
+            additionalProperties: false
+            properties:
+                members:
+                    items:
+                        $ref: '#/components/schemas/MemberSummary'
+                    maxItems: 100
+                    type: array
+                next_after:
+                    format: int32
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+            required:
+                - members
+                - next_after
+            type: object
+        MemberPatchInput:
+            additionalProperties: false
+            description: Передайте хотя бы одно изменяемое поле. Пропущенные поля сохраняются; null очищает только даты. role_id не принимается.
+            minProperties: 2
+            properties:
+                date_of_birth:
+                    description: Дата YYYY-MM-DD, не позднее текущей даты UTC; null означает отсутствие даты.
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                full_name:
+                    maxLength: 150
+                    minLength: 1
+                    type: string
+                membership_date:
+                    description: Дата YYYY-MM-DD, не позднее текущей даты UTC; null означает отсутствие даты.
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                membership_status_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                version:
+                    description: Текущая версия всей карточки. Все изменения карточки, контактов и адресов увеличивают её на один.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+            type: object
+        MemberSummary:
+            additionalProperties: false
+            properties:
+                date_of_birth:
+                    description: Дата YYYY-MM-DD, не позднее текущей даты UTC; null означает отсутствие даты.
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                full_name:
+                    maxLength: 150
+                    minLength: 1
+                    type: string
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                membership_date:
+                    description: Дата YYYY-MM-DD, не позднее текущей даты UTC; null означает отсутствие даты.
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                membership_status:
+                    $ref: '#/components/schemas/MemberDictionary'
+                version:
+                    description: Текущая версия всей карточки. Все изменения карточки, контактов и адресов увеличивают её на один.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - full_name
+                - date_of_birth
+                - membership_date
+                - membership_status
+                - version
+            type: object
         Message:
             additionalProperties: false
             properties:
@@ -403,6 +793,8 @@ components:
                         - auth_unavailable
                         - mail_unavailable
                         - rate_limited
+                        - member_conflict
+                        - members_unavailable
                     type: string
                 detail:
                     description: Безопасное описание ошибки без внутренних технических деталей
@@ -554,9 +946,9 @@ components:
             name: dogclub_refresh
             type: apiKey
 info:
-    description: 'Этап 04: приглашения администратора, единая учётная запись и переключаемые профили. Активен один профиль на сессию; права не объединяются. Авторизация: Bearer access JWT (10 минут), refresh в HttpOnly cookie (7 дней, ротация), состояние PostgreSQL проверяется при запросах. При отключённом профиле доступны собственные me/profiles/switch-profile/logout/change-password; административные и предметные операции запрещены. Auth JSON ограничен 16384 байтами. Почта только локальная (Mailpit). Поле club_member.role_id не предоставляет права доступа. Ошибки RFC 9457; health, включая readiness 503, сохраняет application/json. Браузерные изменяющие запросы проверяются CrossOriginProtection; будущий React использует один origin/прокси API.'
+    description: 'Этапы 04–05: приглашения, аккаунты с переключаемыми профилями и карточки членов клуба. Один активный профиль на сессию, права не объединяются. Access JWT 10 минут; refresh в HttpOnly cookie, абсолютный срок сессии 7 дней, ротация и проверка PostgreSQL. Members: staff редактирует все карточки, leader читает все, owner читает только свою при активном членстве. При неактивном членстве весь раздел владельца закрыт, включая историю и справочники; account controls и другие профили сохраняются. Admin управляет аккаунтами и привязкой к карточке; для ведения карточек нужен staff. club_member.role_id удалён. Все изменения карточек версионируются и сохраняют историю атомарно. JSON auth/members ограничен 16 КиБ. Ошибки RFC 9457; health сохраняет свой JSON DTO. Same-origin browser policy; React позже. Почта только локальная Mailpit.'
     title: Клуб собаководства — backend
-    version: 0.4.0
+    version: 0.5.0
 openapi: 3.1.1
 paths:
     /api/v1/auth/activate:
@@ -1074,6 +1466,740 @@ paths:
             security:
                 - bearerAuth: []
             summary: Новый код на 48 часов, прежнее приглашение отменяется
+    /api/v1/member-dictionaries:
+        get:
+            operationId: getMemberDictionaries
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MemberDictionaries'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/MemberConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/MembersUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Статусы членства, типы контактов и адресов: staff, leader или активный owner'
+            tags:
+                - Members
+    /api/v1/members:
+        get:
+            operationId: listMembers
+            parameters:
+                - in: query
+                  name: after
+                  required: false
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  required: false
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: membership_status_id
+                  required: false
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - description: Подстрока ФИО/email или телефона; телефон ищется также без форматирования. % и _ считаются обычными символами.
+                  in: query
+                  name: q
+                  schema:
+                    maxLength: 254
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MemberPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/MemberConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/MembersUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Список карточек: staff или leader'
+            tags:
+                - Members
+        post:
+            operationId: createMember
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MemberCreateInput'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Member'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/MemberConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/MembersUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Создать карточку: staff'
+            tags:
+                - Members
+    /api/v1/members/{memberID}:
+        get:
+            operationId: getMember
+            parameters:
+                - in: path
+                  name: memberID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Member'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/MemberConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/MembersUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Карточка: staff/leader; owner только своя при активном членстве'
+            tags:
+                - Members
+        patch:
+            operationId: patchMember
+            parameters:
+                - in: path
+                  name: memberID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MemberPatchInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Member'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/MemberConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/MembersUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Изменить карточку: staff'
+            tags:
+                - Members
+    /api/v1/members/{memberID}/addresses:
+        post:
+            operationId: createMemberAddress
+            parameters:
+                - in: path
+                  name: memberID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MemberAddressInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Member'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/MemberConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/MembersUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Добавить адрес: staff; ответ содержит новую версию карточки'
+            tags:
+                - Members
+    /api/v1/members/{memberID}/addresses/{addressID}:
+        delete:
+            operationId: deleteMemberAddress
+            parameters:
+                - in: path
+                  name: memberID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: addressID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: version
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Member'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/MemberConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/MembersUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Удалить неиспользуемый адрес: staff'
+            tags:
+                - Members
+        put:
+            operationId: replaceMemberAddress
+            parameters:
+                - in: path
+                  name: memberID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: addressID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MemberAddressInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Member'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/MemberConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/MembersUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Заменить адрес: staff; используемый мероприятием адрес защищён'
+            tags:
+                - Members
+    /api/v1/members/{memberID}/contacts:
+        post:
+            operationId: createMemberContact
+            parameters:
+                - in: path
+                  name: memberID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MemberContactInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Member'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/MemberConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/MembersUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Добавить контакт: staff; ответ содержит новую версию карточки'
+            tags:
+                - Members
+    /api/v1/members/{memberID}/contacts/{contactID}:
+        delete:
+            operationId: deleteMemberContact
+            parameters:
+                - in: path
+                  name: memberID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: contactID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: version
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Member'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/MemberConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/MembersUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Удалить контакт этой карточки: staff'
+            tags:
+                - Members
+        put:
+            operationId: replaceMemberContact
+            parameters:
+                - in: path
+                  name: memberID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: contactID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MemberContactInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Member'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/MemberConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/MembersUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Заменить контакт этой карточки: staff'
+            tags:
+                - Members
+    /api/v1/members/{memberID}/history:
+        get:
+            operationId: getMemberHistory
+            parameters:
+                - in: path
+                  name: memberID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  required: false
+                  schema:
+                    default: 0
+                    format: int64
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  required: false
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MemberHistoryPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/MemberConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/MembersUnavailable'
+            security:
+                - bearerAuth: []
+            summary: История с тем же ограничением доступа, что и карточка
+            tags:
+                - Members
+    /api/v1/members/me:
+        get:
+            operationId: getOwnMember
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Member'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/MemberConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/MembersUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Своя связанная карточка: staff, leader или активный owner'
+            tags:
+                - Members
     /api/v1/users:
         get:
             description: Требуется действующий активный профиль admin; другие назначенные профили не дают этих прав.
@@ -1179,6 +2305,57 @@ paths:
             security:
                 - bearerAuth: []
             summary: Блокировка/разблокировка; старые сессии не восстанавливаются
+    /api/v1/users/{userID}/member:
+        put:
+            description: Одна карточка — максимум один аккаунт. Повтор той же привязки допустим; перепривязка к другой карточке запрещена.
+            operationId: bindUserMember
+            parameters:
+                - in: path
+                  name: userID
+                  required: true
+                  schema:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/BindMemberInput'
+                required: true
+            responses:
+                "204":
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/AuthConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Первоначальная привязка аккаунта к карточке: admin'
+            tags:
+                - Members
     /api/v1/users/{userID}/profiles:
         post:
             description: Требуется действующий активный профиль admin; другие назначенные профили не дают этих прав.

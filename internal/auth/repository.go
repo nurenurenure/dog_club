@@ -310,3 +310,8 @@ func (q *queries) users(ctx context.Context, after string, limit int) ([]User, e
 	}
 	return users, storageError(rows.Err())
 }
+
+func (q *queries) bindMember(ctx context.Context, userID string, memberID int32) error {
+	_, err := q.db.Exec(ctx, `UPDATE users SET club_member_id=$2 WHERE user_id=$1`, userID, memberID)
+	return storageError(err)
+}

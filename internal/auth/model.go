@@ -87,3 +87,6 @@ func requestID(ctx context.Context) string {
 	id, _ := ctx.Value(metadataKey{}).(string)
 	return id
 }
+
+// RequestID returns the bounded identifier used by transactional audit records.
+func RequestID(ctx context.Context) string { return requestID(ctx) }

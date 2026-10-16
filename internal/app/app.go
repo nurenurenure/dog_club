@@ -10,6 +10,7 @@ import (
 
 	"dogclub.local/backend/internal/auth"
 	"dogclub.local/backend/internal/health"
+	"dogclub.local/backend/internal/members"
 	"dogclub.local/backend/internal/platform/config"
 	"dogclub.local/backend/internal/platform/database"
 	"dogclub.local/backend/internal/platform/httpapi"
@@ -42,10 +43,11 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		pool.Close()
 		return nil, err
 	}
-	return newApp(cfg, logger, pool.Ping, pool.Close, auth.NewHandler(service, cfg.CookieSecure)), nil
+	authHandler := auth.NewHandler(service, cfg.CookieSecure)
+	return newApp(cfg, logger, pool.Ping, pool.Close, authHandler, members.NewHandler(members.NewService(service), authHandler)), nil
 }
 
-func newApp(cfg config.Config, logger *slog.Logger, ping func(context.Context) error, closePool func(), authHandlers ...*auth.Handler) *App {
+func newApp(cfg config.Config, logger *slog.Logger, ping func(context.Context) error, closePool func(), apiHandlers ...interface{ RegisterRoutes(chi.Router) }) *App {
 	h := health.New(ping, cfg.DBPingTimeout)
 	router := chi.NewRouter()
 	router.Use(chimiddleware.RequestID)
@@ -55,8 +57,12 @@ func newApp(cfg config.Config, logger *slog.Logger, ping func(context.Context) e
 	router.MethodNotAllowed(httpapi.MethodNotAllowed(router))
 	router.Get("/health/live", h.Live)
 	router.Get("/health/ready", h.Ready)
-	for _, h := range authHandlers {
-		h.Register(router)
+	if len(apiHandlers) > 0 {
+		router.Route("/api/v1", func(r chi.Router) {
+			for _, h := range apiHandlers {
+				h.RegisterRoutes(r)
+			}
+		})
 	}
 	return &App{
 		cfg: cfg, logger: logger, health: h, closePool: closePool,

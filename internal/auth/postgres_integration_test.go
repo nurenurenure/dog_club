@@ -161,10 +161,10 @@ func TestPostgresAccountAndProfileLifecycle(t *testing.T) {
 	expect(s.SetUserBlocked(ctx, admin, admin.User.ID, true), ErrLastAdmin)
 	expect(s.SetProfileEnabled(ctx, admin, admin.User.ID, admin.Profile.ID, false), ErrLastAdmin)
 
-	// Old domain role must not silently assign access roles to the account.
+	// A linked member card must not silently assign access roles to its account.
 	var member int32
-	must(pool.QueryRow(ctx, `INSERT INTO club_member(club_member_full_name,role_id,membership_status_id)
-		SELECT 'Integration person',role_id,1 FROM role WHERE code='admin' RETURNING club_member_id`).Scan(&member))
+	must(pool.QueryRow(ctx, `INSERT INTO club_member(club_member_full_name,membership_status_id)
+		VALUES ('Integration person',1) RETURNING club_member_id`).Scan(&member))
 	invite, err := s.Invite(ctx, admin, InviteInput{Login: "anna", Email: "anna@integration.test", Role: "owner", ClubMemberID: &member})
 	must(err)
 	activation := mail.code(t)

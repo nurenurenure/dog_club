@@ -32,10 +32,12 @@ func NewHandler(service *Service, secure bool) *Handler {
 }
 
 func (h *Handler) Register(router chi.Router) {
-	router.Route("/api/v1", func(r chi.Router) {
-		csrf := http.NewCrossOriginProtection()
-		csrf.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { writeAuthError(w, r, ErrForbidden) }))
-		r.Use(csrf.Handler)
+	router.Route("/api/v1", h.RegisterRoutes)
+}
+
+func (h *Handler) RegisterRoutes(router chi.Router) {
+	router.Group(func(r chi.Router) {
+		r.Use(httpapi.Protect)
 		r.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Cache-Control", "no-store")
@@ -49,7 +51,7 @@ func (h *Handler) Register(router chi.Router) {
 		r.Post("/auth/forgot-password", h.publicLimit(5, 15*time.Minute, h.forgot))
 		r.Post("/auth/reset-password", h.publicLimit(10, time.Minute, h.reset))
 		r.Group(func(r chi.Router) {
-			r.Use(h.requireAccount)
+			r.Use(h.RequireAccount)
 			r.Get("/auth/me", h.me)
 			r.Get("/auth/profiles", h.profiles)
 			r.Post("/auth/switch-profile", h.switchProfile)
@@ -59,6 +61,7 @@ func (h *Handler) Register(router chi.Router) {
 				r.Use(h.requireAdmin)
 				r.Get("/users", h.users)
 				r.Patch("/users/{userID}", h.blockUser)
+				r.Put("/users/{userID}/member", h.bindMember)
 				r.Post("/users/{userID}/profiles", h.addProfile)
 				r.Patch("/users/{userID}/profiles/{profileID}", h.profileState)
 				r.Post("/invitations", h.publicLimit(20, time.Minute, h.invite))
@@ -69,9 +72,9 @@ func (h *Handler) Register(router chi.Router) {
 	})
 }
 
-func principalFrom(r *http.Request) Principal { return r.Context().Value(principalKey{}).(Principal) }
+func PrincipalFrom(r *http.Request) Principal { return r.Context().Value(principalKey{}).(Principal) }
 
-func (h *Handler) requireAccount(next http.Handler) http.Handler {
+func (h *Handler) RequireAccount(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		parts := strings.Fields(r.Header.Get("Authorization"))
 		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
@@ -83,13 +86,14 @@ func (h *Handler) requireAccount(next http.Handler) http.Handler {
 			writeAuthError(w, r, err)
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, p)))
+		ctx := WithRequestID(r.Context(), chimiddleware.GetReqID(r.Context()))
+		next.ServeHTTP(w, r.WithContext(context.WithValue(ctx, principalKey{}, p)))
 	})
 }
 
 func (h *Handler) requireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := RequireProfile(principalFrom(r), "admin"); err != nil {
+		if err := RequireProfile(PrincipalFrom(r), "admin"); err != nil {
 			writeAuthError(w, r, err)
 			return
 		}
@@ -165,10 +169,10 @@ func (h *Handler) clearCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{Name: refreshCookie, Path: cookiePath, MaxAge: -1, Expires: time.Unix(1, 0), HttpOnly: true, Secure: h.secure, SameSite: http.SameSiteStrictMode})
 }
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
-	httpapi.WriteJSON(w, 200, principalFrom(r))
+	httpapi.WriteJSON(w, 200, PrincipalFrom(r))
 }
 func (h *Handler) profiles(w http.ResponseWriter, r *http.Request) {
-	profiles, err := h.service.Profiles(r.Context(), principalFrom(r))
+	profiles, err := h.service.Profiles(r.Context(), PrincipalFrom(r))
 	if err != nil {
 		writeAuthError(w, r, err)
 		return
@@ -184,7 +188,7 @@ func (h *Handler) switchProfile(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	c, err := h.service.SwitchProfile(r.Context(), principalFrom(r), in.ProfileID)
+	c, err := h.service.SwitchProfile(r.Context(), PrincipalFrom(r), in.ProfileID)
 	if err != nil {
 		writeAuthError(w, r, err)
 		return
@@ -192,7 +196,7 @@ func (h *Handler) switchProfile(w http.ResponseWriter, r *http.Request) {
 	h.writeCredentials(w, c)
 }
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.Logout(r.Context(), principalFrom(r)); err != nil {
+	if err := h.service.Logout(r.Context(), PrincipalFrom(r)); err != nil {
 		writeAuthError(w, r, err)
 		return
 	}
@@ -237,7 +241,7 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if err := h.service.ChangePassword(r.Context(), principalFrom(r), in.CurrentPassword, in.Password); err != nil {
+	if err := h.service.ChangePassword(r.Context(), PrincipalFrom(r), in.CurrentPassword, in.Password); err != nil {
 		writeAuthError(w, r, err)
 		return
 	}
@@ -249,7 +253,7 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	i, err := h.service.Invite(r.Context(), principalFrom(r), in)
+	i, err := h.service.Invite(r.Context(), PrincipalFrom(r), in)
 	if errors.Is(err, ErrMail) {
 		w.Header().Set("Location", "/api/v1/invitations/"+i.ID+"/resend")
 	}
@@ -260,7 +264,7 @@ func (h *Handler) invite(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(w, 201, i)
 }
 func (h *Handler) resend(w http.ResponseWriter, r *http.Request) {
-	i, err := h.service.ResendInvitation(r.Context(), principalFrom(r), chi.URLParam(r, "invitationID"))
+	i, err := h.service.ResendInvitation(r.Context(), PrincipalFrom(r), chi.URLParam(r, "invitationID"))
 	if errors.Is(err, ErrMail) {
 		w.Header().Set("Location", "/api/v1/invitations/"+i.ID+"/resend")
 	}
@@ -271,7 +275,7 @@ func (h *Handler) resend(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(w, 200, i)
 }
 func (h *Handler) cancelInvitation(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.CancelInvitation(r.Context(), principalFrom(r), chi.URLParam(r, "invitationID")); err != nil {
+	if err := h.service.CancelInvitation(r.Context(), PrincipalFrom(r), chi.URLParam(r, "invitationID")); err != nil {
 		writeAuthError(w, r, err)
 		return
 	}
@@ -283,7 +287,7 @@ func (h *Handler) users(w http.ResponseWriter, r *http.Request) {
 		writeAuthError(w, r, err)
 		return
 	}
-	users, err := h.service.Users(r.Context(), principalFrom(r), r.URL.Query().Get("after"), limit)
+	users, err := h.service.Users(r.Context(), PrincipalFrom(r), r.URL.Query().Get("after"), limit)
 	if err != nil {
 		writeAuthError(w, r, err)
 		return
@@ -303,7 +307,7 @@ func (h *Handler) blockUser(w http.ResponseWriter, r *http.Request) {
 		writeAuthError(w, r, ErrInvalidInput)
 		return
 	}
-	if err := h.service.SetUserBlocked(r.Context(), principalFrom(r), chi.URLParam(r, "userID"), *in.Blocked); err != nil {
+	if err := h.service.SetUserBlocked(r.Context(), PrincipalFrom(r), chi.URLParam(r, "userID"), *in.Blocked); err != nil {
 		writeAuthError(w, r, err)
 		return
 	}
@@ -316,7 +320,7 @@ func (h *Handler) addProfile(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	p, err := h.service.AddProfile(r.Context(), principalFrom(r), chi.URLParam(r, "userID"), in.Role)
+	p, err := h.service.AddProfile(r.Context(), PrincipalFrom(r), chi.URLParam(r, "userID"), in.Role)
 	if err != nil {
 		writeAuthError(w, r, err)
 		return
@@ -334,7 +338,7 @@ func (h *Handler) profileState(w http.ResponseWriter, r *http.Request) {
 		writeAuthError(w, r, ErrInvalidInput)
 		return
 	}
-	if err := h.service.SetProfileEnabled(r.Context(), principalFrom(r), chi.URLParam(r, "userID"), chi.URLParam(r, "profileID"), *in.Enabled); err != nil {
+	if err := h.service.SetProfileEnabled(r.Context(), PrincipalFrom(r), chi.URLParam(r, "userID"), chi.URLParam(r, "profileID"), *in.Enabled); err != nil {
 		writeAuthError(w, r, err)
 		return
 	}
@@ -419,4 +423,21 @@ func (h *Handler) publicLimit(n int, d time.Duration, next http.HandlerFunc) htt
 		}
 		next(w, r)
 	}
+}
+
+// WriteError maps auth failures consistently for other HTTP modules.
+func WriteError(w http.ResponseWriter, r *http.Request, err error) { writeAuthError(w, r, err) }
+
+func (h *Handler) bindMember(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		MemberID int32 `json:"member_id"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if err := h.service.BindMember(r.Context(), PrincipalFrom(r), chi.URLParam(r, "userID"), in.MemberID); err != nil {
+		writeAuthError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

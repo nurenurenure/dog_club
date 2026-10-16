@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type Options struct {
@@ -621,5 +623,49 @@ func (s *Service) SetUserBlocked(ctx context.Context, p Principal, userID string
 			event = "account_blocked"
 		}
 		return q.event(ctx, &p, userID, event)
+	})
+}
+
+// WithAccess rechecks current account, session and profile inside the same
+// PostgreSQL transaction as the caller's operation. The advisory lock also
+// serializes it with revocation, profile switches and membership changes.
+// Callbacks must use this transaction and must not perform external I/O.
+func (s *Service) WithAccess(ctx context.Context, p Principal, roles []string, fn func(context.Context, pgx.Tx, Principal) error) error {
+	ctx, cancel := s.scope(ctx)
+	defer cancel()
+	return s.repo.transaction(ctx, func(q *queries) error {
+		current, err := s.authorize(ctx, q, p, false)
+		if err != nil {
+			return err
+		}
+		if err := RequireProfile(current, roles...); err != nil {
+			return err
+		}
+		return fn(ctx, q.db.(pgx.Tx), current)
+	})
+}
+
+// BindMember assigns the initial identity link. Reassignment/unlinking requires
+// a separate workflow; repeating the same link is safe.
+func (s *Service) BindMember(ctx context.Context, p Principal, userID string, memberID int32) error {
+	if memberID <= 0 {
+		return ErrInvalidInput
+	}
+	return s.WithAccess(ctx, p, []string{"admin"}, func(ctx context.Context, tx pgx.Tx, current Principal) error {
+		q := &queries{db: tx}
+		user, err := q.user(ctx, userID)
+		if err != nil {
+			return err
+		}
+		if user.ClubMemberID != nil {
+			if *user.ClubMemberID == memberID {
+				return nil
+			}
+			return ErrConflict
+		}
+		if err := q.bindMember(ctx, userID, memberID); err != nil {
+			return err
+		}
+		return q.event(ctx, &current, userID, "member_linked")
 	})
 }

@@ -32,7 +32,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if err := Run(ctx, "status", url, &output); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(output.String(), "pending") != 3 || scalar(t, ctx, conn,
+	if strings.Count(output.String(), "pending") != 4 || scalar(t, ctx, conn,
 		`SELECT count(*) FROM pg_tables WHERE schemaname='public'`) != 0 {
 		t.Fatal("status on an empty database must list pending migrations without creating tables")
 	}
@@ -46,19 +46,19 @@ func TestPostgresMigrations(t *testing.T) {
 			t.Fatalf("unexpected migration result: %q", output.String())
 		}
 	}
-	apply("applied 3 migration(s)\n")
-	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 41 {
-		t.Fatalf("expected 40 application tables and Goose history, got %d", count)
+	apply("applied 4 migration(s)\n")
+	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 42 {
+		t.Fatalf("expected 41 application tables and Goose history, got %d", count)
 	}
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_constraint c JOIN pg_namespace n
-		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 49 {
-		t.Fatalf("expected 37 domain and 12 auth FK, got %d", count)
+		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 51 {
+		t.Fatalf("expected 36 domain, 12 auth and 3 member-history FK, got %d", count)
 	}
 	checkSeeds(t, ctx, conn)
 	apply("applied 0 migration(s)\n")
 	output.Reset()
-	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 3 {
-		t.Fatalf("expected three applied versions: %v %q", err, output.String())
+	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 4 {
+		t.Fatalf("expected four applied versions: %v %q", err, output.String())
 	}
 
 	t.Run("constraints and deletion policies", func(t *testing.T) {
@@ -67,8 +67,8 @@ func TestPostgresMigrations(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer tx.Rollback(context.Background())
-		fixture := `INSERT INTO club_member (club_member_id, club_member_full_name, role_id, membership_status_id)
-			VALUES (1001, 'Тестовый участник', 1, 1);
+		fixture := `INSERT INTO club_member (club_member_id, club_member_full_name, membership_status_id)
+			VALUES (1001, 'Тестовый участник', 1);
 		INSERT INTO dog (dog_id, dog_nickname, dog_date_of_birth, dog_identifier_number,
 			dog_status_id, identifier_type_id, dog_breed_id, coat_color_id, sex_id) VALUES
 			(1001, 'Тест 1', '2020-01-01', 'CHECK-ONE', 1, 1, 1, 1, 1),
@@ -146,7 +146,10 @@ func TestPostgresMigrations(t *testing.T) {
 	})
 
 	t.Run("referenced seeds prevent partial rollback", func(t *testing.T) {
-		// Roll back auth in this isolated database before attempting the seed down.
+		// Roll back members and auth before attempting the seed down.
+		if err := Run(ctx, "down", url, io.Discard); err != nil {
+			t.Fatal(err)
+		}
 		if err := Run(ctx, "down", url, io.Discard); err != nil {
 			t.Fatal(err)
 		}
@@ -167,7 +170,7 @@ func TestPostgresMigrations(t *testing.T) {
 		checkSeeds(t, ctx, conn)
 	})
 
-	for range 3 {
+	for range 4 {
 		if err := Run(ctx, "down", url, io.Discard); err != nil {
 			t.Fatal(err)
 		}
@@ -175,7 +178,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 1 {
 		t.Fatalf("full rollback must leave only Goose history, got %d tables", count)
 	}
-	apply("applied 3 migration(s)\n")
+	apply("applied 4 migration(s)\n")
 	checkSeeds(t, ctx, conn)
 }
 
@@ -191,6 +194,37 @@ func TestBaselineRefusesExistingUnversionedData(t *testing.T) {
 	if scalar(t, ctx, conn, `SELECT count(*) FROM existing_data`) != 1 ||
 		scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`) != 1 {
 		t.Fatal("existing schema was changed")
+	}
+}
+
+func TestMembersUpgradePreservesCardsAndRefusesDestructiveRollback(t *testing.T) {
+	ctx, url, conn := testDatabase(t)
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "down", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `INSERT INTO club_member(club_member_full_name,role_id,membership_status_id) VALUES('Legacy card',1,1)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM club_member WHERE club_member_full_name='Legacy card' AND version=1`) != 1 {
+		t.Fatal("upgrade lost the member card")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM information_schema.columns WHERE table_name='club_member' AND column_name='role_id'`) != 0 {
+		t.Fatal("legacy role column was not removed")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM users`) != 0 || scalar(t, ctx, conn, `SELECT count(*) FROM user_profiles`) != 0 {
+		t.Fatal("legacy role was turned into access privileges")
+	}
+	if err := Run(ctx, "down", url, io.Discard); err == nil {
+		t.Fatal("rollback invented a role for an existing card")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM club_member`) != 1 || scalar(t, ctx, conn, `SELECT count(*) FROM member_changes`) != 0 {
+		t.Fatal("failed rollback changed the member schema or data")
 	}
 }
 
