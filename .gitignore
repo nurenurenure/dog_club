@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+/context/sources/
+/context/reference/
+*.pdf
+.DS_Store
+.idea/
+.vscode/
+*.log
+/tmp/
+/bin/
+/coverage.out
