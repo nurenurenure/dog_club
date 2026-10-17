@@ -24,6 +24,7 @@ import (
 	"dogclub.local/backend/internal/platform/middleware"
 	"dogclub.local/backend/internal/platform/notify"
 	"dogclub.local/backend/internal/reports"
+	"dogclub.local/backend/internal/training"
 	"dogclub.local/backend/internal/veterinary"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -61,6 +62,8 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	breedingService := breeding.NewService(service, dogService, vetService)
 	dogService.SetEventPolicy(events.DogPolicy{})
 	eventService := events.NewService(service, memberService, dogService, vetService)
+	trainingService := training.NewService(service, memberService, dogService, vetService, eventService)
+	dogService.SetTrainingPolicy(training.DogPolicy{})
 	files, err := filestore.New(cfg.DocumentsDir)
 	if err != nil {
 		pool.Close()
@@ -74,7 +77,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	eventService.SetNotificationSink(notifier)
 	documentService.SetNotificationSink(notifier)
 	application := newApp(cfg, logger, pool.Ping, func() { _ = files.Close(); pool.Close() }, authHandler,
-		members.NewHandler(memberService, authHandler), dogs.NewHandler(dogService, authHandler), veterinary.NewHandler(vetService, authHandler), breeding.NewHandler(breedingService, authHandler), events.NewHandler(eventService, authHandler), documents.NewHandler(documentService, authHandler), reports.NewHandler(reportService, authHandler))
+		members.NewHandler(memberService, authHandler), dogs.NewHandler(dogService, authHandler), veterinary.NewHandler(vetService, authHandler), breeding.NewHandler(breedingService, authHandler), events.NewHandler(eventService, authHandler), documents.NewHandler(documentService, authHandler), reports.NewHandler(reportService, authHandler), training.NewHandler(trainingService, authHandler))
 	application.worker = notifier.Run
 	return application, nil
 }

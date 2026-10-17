@@ -16,6 +16,7 @@ import (
 )
 
 type Service struct {
+	training      TrainingPolicy
 	notifications notify.Sink
 	access        *auth.Service
 	members       *members.Service
@@ -268,6 +269,15 @@ func (s *Service) mutate(ctx context.Context, p auth.Principal, id int32, versio
 			}
 			if !ok {
 				return invalid("date_of_birth", "Дата рождения противоречит зарегистрированному участию в мероприятии.")
+			}
+		}
+		if s.training != nil {
+			ok, e := s.training.Consistent(ctx, tx, before, result)
+			if e != nil {
+				return ErrUnavailable
+			}
+			if !ok {
+				return invalid("date_of_birth", "Дата рождения противоречит подтверждённому занятию.")
 			}
 		}
 		return q.record(ctx, current, action, reason, &before, result)

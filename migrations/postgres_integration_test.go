@@ -32,7 +32,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if err := Run(ctx, "status", url, &output); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(output.String(), "pending") != 12 || scalar(t, ctx, conn,
+	if strings.Count(output.String(), "pending") != 13 || scalar(t, ctx, conn,
 		`SELECT count(*) FROM pg_tables WHERE schemaname='public'`) != 0 {
 		t.Fatal("status on an empty database must list pending migrations without creating tables")
 	}
@@ -46,19 +46,19 @@ func TestPostgresMigrations(t *testing.T) {
 			t.Fatalf("unexpected migration result: %q", output.String())
 		}
 	}
-	apply("applied 12 migration(s)\n")
-	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 63 {
-		t.Fatalf("expected 62 application tables and Goose history, got %d", count)
+	apply("applied 13 migration(s)\n")
+	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 66 {
+		t.Fatalf("expected 65 application tables and Goose history, got %d", count)
 	}
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_constraint c JOIN pg_namespace n
-		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 114 {
-		t.Fatalf("expected 110 previous and 4 notification FK, got %d", count)
+		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 127 {
+		t.Fatalf("expected 114 previous and 13 training FK, got %d", count)
 	}
 	checkSeeds(t, ctx, conn)
 	apply("applied 0 migration(s)\n")
 	output.Reset()
-	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 12 {
-		t.Fatalf("expected twelve applied versions: %v %q", err, output.String())
+	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 13 {
+		t.Fatalf("expected thirteen applied versions: %v %q", err, output.String())
 	}
 
 	t.Run("constraints and deletion policies", func(t *testing.T) {
@@ -168,7 +168,7 @@ func TestPostgresMigrations(t *testing.T) {
 		checkSeeds(t, ctx, conn)
 	})
 
-	for range 12 {
+	for range 13 {
 		if err := Run(ctx, "down", url, io.Discard); err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 1 {
 		t.Fatalf("full rollback must leave only Goose history, got %d tables", count)
 	}
-	apply("applied 12 migration(s)\n")
+	apply("applied 13 migration(s)\n")
 	checkSeeds(t, ctx, conn)
 }
 
@@ -684,6 +684,7 @@ func TestNotificationsUpgradeAndProtectedHistory(t *testing.T) {
 	if scalar(t, ctx, conn, `SELECT count(*) FROM notification_event`) != 0 || scalar(t, ctx, conn, `SELECT count(*) FROM vaccination_reminder_replacement`) != 0 {
 		t.Fatal("upgrade invented events or replacements")
 	}
+	rollbackTo(t, ctx, url, 12)
 	if err := Run(ctx, "down", url, io.Discard); err != nil {
 		t.Fatal(err)
 	}
@@ -693,10 +694,50 @@ func TestNotificationsUpgradeAndProtectedHistory(t *testing.T) {
 	if _, err := conn.Exec(ctx, `INSERT INTO notification_event(event_key,payload) VALUES('synthetic/test','{}')`); err != nil {
 		t.Fatal(err)
 	}
+	rollbackTo(t, ctx, url, 12)
 	if err := Run(ctx, "down", url, io.Discard); err == nil {
 		t.Fatal("notification history silently discarded")
 	}
 	if scalar(t, ctx, conn, `SELECT count(*) FROM notification_event`) != 1 {
 		t.Fatal("failed rollback changed journal")
+	}
+}
+
+func TestTrainingUpgradePreservesLegacyAndProtectsGrants(t *testing.T) {
+	ctx, url, conn := testDatabase(t)
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	rollbackTo(t, ctx, url, 12)
+	if _, err := conn.Exec(ctx, `INSERT INTO club_member(club_member_id,club_member_full_name,membership_status_id) VALUES(1201,'Synthetic legacy instructor',2);
+ INSERT INTO dog(dog_id,dog_nickname,dog_date_of_birth,dog_identifier_number,dog_status_id,identifier_type_id,dog_breed_id,coat_color_id,sex_id) VALUES(1201,'Synthetic legacy trained dog','2020-01-01','TRAINING-LEGACY-1201',1,1,1,1,1);
+ INSERT INTO dog_training_session(dog_training_session_id,dog_id,club_member_id,training_type_id,dog_training_session_start_date,dog_training_session_end_date) VALUES(1201,1201,1201,1,'2024-02-02 23:59:59.123456',NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM dog_training_session WHERE dog_id=1201 AND dog_training_session_id=1201 AND club_member_id=1201 AND dog_training_session_start_date='2024-02-02 23:59:59.123456' AND dog_training_session_end_date IS NULL AND starts_at IS NULL AND timezone IS NULL AND result IS NULL AND instructor_profile_id IS NULL AND medical_snapshot IS NULL AND event_id IS NULL AND version=1 AND NOT is_void`) != 1 {
+		t.Fatal("legacy time/author/qualification was fabricated")
+	}
+	if err := Run(ctx, "down", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM dog_training_session WHERE dog_training_session_id=1201 AND dog_training_session_start_date='2024-02-02 23:59:59.123456' AND dog_training_session_end_date IS NULL`) != 1 {
+		t.Fatal("rollback damaged legacy fact")
+	}
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `INSERT INTO users(user_id,login,email,club_member_id) VALUES('training-test-user','training_test','synthetic@training.test',1201);
+ INSERT INTO user_profiles(profile_id,user_id,role_id) SELECT 'training-test-profile','training-test-user',role_id FROM role WHERE code='staff';
+ INSERT INTO training_instructor(profile_id,user_id,member_id,enabled,qualification) VALUES('training-test-profile','training-test-user',1201,false,'Synthetic grant history')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "down", url, io.Discard); err == nil {
+		t.Fatal("rollback discarded instructor grant")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM training_instructor`) != 1 {
+		t.Fatal("failed rollback lost grant")
 	}
 }
