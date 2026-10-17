@@ -21,6 +21,7 @@ import (
 	"dogclub.local/backend/internal/platform/httpapi"
 	"dogclub.local/backend/internal/platform/mail"
 	"dogclub.local/backend/internal/platform/middleware"
+	"dogclub.local/backend/internal/reports"
 	"dogclub.local/backend/internal/veterinary"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -62,9 +63,10 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		pool.Close()
 		return nil, fmt.Errorf("private document storage unavailable")
 	}
+	reportService := reports.NewService(service, memberService, dogService, breedingService, eventService)
 	documentService := documents.NewService(service, memberService, dogService, vetService, files, breedingService, eventService)
 	return newApp(cfg, logger, pool.Ping, func() { _ = files.Close(); pool.Close() }, authHandler,
-		members.NewHandler(memberService, authHandler), dogs.NewHandler(dogService, authHandler), veterinary.NewHandler(vetService, authHandler), breeding.NewHandler(breedingService, authHandler), events.NewHandler(eventService, authHandler), documents.NewHandler(documentService, authHandler)), nil
+		members.NewHandler(memberService, authHandler), dogs.NewHandler(dogService, authHandler), veterinary.NewHandler(vetService, authHandler), breeding.NewHandler(breedingService, authHandler), events.NewHandler(eventService, authHandler), documents.NewHandler(documentService, authHandler), reports.NewHandler(reportService, authHandler)), nil
 }
 
 func newApp(cfg config.Config, logger *slog.Logger, ping func(context.Context) error, closePool func(), apiHandlers ...interface{ RegisterRoutes(chi.Router) }) *App {

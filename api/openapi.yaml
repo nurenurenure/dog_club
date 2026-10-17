@@ -5117,6 +5117,152 @@ components:
                 - reason
                 - registration_date
             type: object
+        ReportPeriod:
+            additionalProperties: false
+            properties:
+                from:
+                    format: date
+                    type: string
+                to:
+                    format: date
+                    type: string
+            required:
+                - from
+                - to
+            type: object
+        ReportEventType:
+            additionalProperties: false
+            properties:
+                type_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                type_name:
+                    type: string
+                count:
+                    format: int64
+                    minimum: 0
+                    type: integer
+            required:
+                - type_id
+                - type_name
+                - count
+            type: object
+        ReportActivity:
+            additionalProperties: false
+            properties:
+                members_joined:
+                    format: int64
+                    minimum: 0
+                    type: integer
+                dogs_registered:
+                    format: int64
+                    minimum: 0
+                    type: integer
+                events_completed:
+                    format: int64
+                    minimum: 0
+                    type: integer
+                events_by_type:
+                    items:
+                        $ref: '#/components/schemas/ReportEventType'
+                    type: array
+                matings_performed:
+                    format: int64
+                    minimum: 0
+                    type: integer
+                litters_born:
+                    format: int64
+                    minimum: 0
+                    type: integer
+                puppies_born:
+                    format: int64
+                    minimum: 0
+                    type: integer
+            required:
+                - members_joined
+                - dogs_registered
+                - events_completed
+                - events_by_type
+                - matings_performed
+                - litters_born
+                - puppies_born
+            type: object
+        ReportCurrent:
+            additionalProperties: false
+            properties:
+                member_cards:
+                    format: int64
+                    minimum: 0
+                    type: integer
+                active_members:
+                    format: int64
+                    minimum: 0
+                    type: integer
+                dog_cards:
+                    format: int64
+                    minimum: 0
+                    type: integer
+                dogs_on_register:
+                    format: int64
+                    minimum: 0
+                    type: integer
+            required:
+                - member_cards
+                - active_members
+                - dog_cards
+                - dogs_on_register
+            type: object
+        ReportDataQuality:
+            additionalProperties: false
+            properties:
+                members_without_membership_date:
+                    format: int64
+                    minimum: 0
+                    type: integer
+                dogs_without_registration_date:
+                    format: int64
+                    minimum: 0
+                    type: integer
+                performed_matings_without_date:
+                    format: int64
+                    minimum: 0
+                    type: integer
+                events_without_period:
+                    format: int64
+                    minimum: 0
+                    type: integer
+            required:
+                - members_without_membership_date
+                - dogs_without_registration_date
+                - performed_matings_without_date
+                - events_without_period
+            type: object
+        ClubActivityReport:
+            additionalProperties: false
+            properties:
+                period:
+                    $ref: '#/components/schemas/ReportPeriod'
+                generated_at:
+                    format: date-time
+                    type: string
+                methodology:
+                    minLength: 1
+                    type: string
+                activity:
+                    $ref: '#/components/schemas/ReportActivity'
+                current:
+                    $ref: '#/components/schemas/ReportCurrent'
+                data_quality:
+                    $ref: '#/components/schemas/ReportDataQuality'
+            required:
+                - period
+                - generated_at
+                - methodology
+                - activity
+                - current
+                - data_quality
+            type: object
     securitySchemes:
         bearerAuth:
             bearerFormat: JWT
@@ -5127,9 +5273,9 @@ components:
             name: dogclub_refresh
             type: apiKey
 info:
-    description: Этапы 04–09 и части 1–3 этапа 10. Закрытые документы и девять PDF-форм, включая списки участников, итоговые протоколы и дипломы мероприятий. Подтверждённая дата регистрации собаки, племенные основания, персональные копии, права, версии, история и снимки источников.
+    description: Этапы 04–09 и части 1–4 этапа 10. Закрытые документы, девять документных PDF-форм и сводный отчёт в JSON/PDF/CSV без серверного архива. Права, версии, история и снимки документов; показатели за период, текущие итоги и полнота дат отчёта.
     title: Клуб собаководства — backend
-    version: 0.10.2
+    version: 0.10.3
 openapi: 3.1.1
 paths:
     /api/v1/breeding-requests:
@@ -13604,5 +13750,138 @@ paths:
             summary: Подтвердить, исправить или снять подтверждение даты регистрации собаки
             tags:
                 - Dogs
+    /api/v1/reports/club-activity:
+        get:
+            operationId: getClubActivity
+            summary: Club activity and current totals for staff or leader
+            parameters:
+                - in: query
+                  name: from
+                  required: true
+                  schema:
+                    format: date
+                    type: string
+                - in: query
+                  name: to
+                  required: true
+                  schema:
+                    format: date
+                    type: string
+            responses:
+                "200":
+                    description: Success
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ClubActivityReport'
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    description: Reports or authorization storage unavailable
+                    content:
+                        application/problem+json:
+                            schema:
+                                $ref: '#/components/schemas/Problem'
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+            security:
+                - bearerAuth: []
+            tags:
+                - Reports
+    /api/v1/reports/club-activity/export:
+        get:
+            operationId: exportClubActivity
+            summary: Export club activity as PDF or CSV
+            parameters:
+                - in: query
+                  name: from
+                  required: true
+                  schema:
+                    format: date
+                    type: string
+                - in: query
+                  name: to
+                  required: true
+                  schema:
+                    format: date
+                    type: string
+                - in: query
+                  name: format
+                  required: true
+                  schema:
+                    enum: [pdf, csv]
+                    type: string
+            responses:
+                "200":
+                    description: Success
+                    content:
+                        application/pdf:
+                            schema:
+                                type: string
+                                format: binary
+                        text/csv:
+                            schema:
+                                type: string
+                                format: binary
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                        Content-Disposition:
+                            required: true
+                            schema:
+                                type: string
+                        Content-Length:
+                            required: true
+                            schema:
+                                type: integer
+                                minimum: 0
+                        X-Content-Type-Options:
+                            required: true
+                            schema:
+                                const: nosniff
+                                type: string
+                        Content-Security-Policy:
+                            required: true
+                            schema:
+                                type: string
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    description: Reports or authorization storage unavailable
+                    content:
+                        application/problem+json:
+                            schema:
+                                $ref: '#/components/schemas/Problem'
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+            security:
+                - bearerAuth: []
+            tags:
+                - Reports
 servers:
     - url: http://127.0.0.1:8080

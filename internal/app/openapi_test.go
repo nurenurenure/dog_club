@@ -14,6 +14,7 @@ import (
 	"dogclub.local/backend/internal/dogs"
 	"dogclub.local/backend/internal/events"
 	"dogclub.local/backend/internal/members"
+	"dogclub.local/backend/internal/reports"
 	"dogclub.local/backend/internal/veterinary"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -33,7 +34,7 @@ func TestRoutesAndResponsesMatchOpenAPI(t *testing.T) {
 			return errors.New("private_database_error")
 		}
 		return nil
-	}, func() {}, auth.NewHandler(nil, false), members.NewHandler(nil, auth.NewHandler(nil, false)), dogs.NewHandler(nil, auth.NewHandler(nil, false)), veterinary.NewHandler(nil, auth.NewHandler(nil, false)), breeding.NewHandler(nil, auth.NewHandler(nil, false)), events.NewHandler(nil, auth.NewHandler(nil, false)), documents.NewHandler(nil, auth.NewHandler(nil, false)))
+	}, func() {}, auth.NewHandler(nil, false), members.NewHandler(nil, auth.NewHandler(nil, false)), dogs.NewHandler(nil, auth.NewHandler(nil, false)), veterinary.NewHandler(nil, auth.NewHandler(nil, false)), breeding.NewHandler(nil, auth.NewHandler(nil, false)), events.NewHandler(nil, auth.NewHandler(nil, false)), documents.NewHandler(nil, auth.NewHandler(nil, false)), reports.NewHandler(nil, auth.NewHandler(nil, false)))
 	mux := a.server.Handler.(*chi.Mux)
 	var routes int
 	if err := chi.Walk(mux, func(method, path string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
