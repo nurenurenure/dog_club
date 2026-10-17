@@ -6,11 +6,13 @@ import (
 	"dogclub.local/backend/internal/auth"
 	"dogclub.local/backend/internal/breeding"
 	"dogclub.local/backend/internal/dogs"
+	"dogclub.local/backend/internal/events"
 	"dogclub.local/backend/internal/members"
 	"dogclub.local/backend/internal/veterinary"
 )
 
 type sourceSnapshot struct {
+	Event        *events.DocumentSource     `json:"event,omitempty"`
 	ExpertName   string                     `json:"expert_name,omitempty"`
 	Breeding     *breeding.DocumentSource   `json:"breeding,omitempty"`
 	Document     Input                      `json:"document"`
@@ -31,6 +33,9 @@ func (s *Service) source(ctx context.Context, q *repository, p auth.Principal, d
 	}
 	if (d.BreedingDecisionID != nil || d.LitterID != nil) && in.Template != "breeding_conclusion" && in.Template != "litter_act" {
 		return out, invalid("template", "Выберите соответствующую племенную форму.")
+	}
+	if d.EventID != nil {
+		return s.eventSource(ctx, q, p, d, in, issuing, out)
 	}
 	switch in.Template {
 	case "breeding_conclusion", "litter_act":

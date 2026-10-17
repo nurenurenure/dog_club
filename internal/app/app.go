@@ -62,7 +62,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		pool.Close()
 		return nil, fmt.Errorf("private document storage unavailable")
 	}
-	documentService := documents.NewService(service, memberService, dogService, vetService, files, breedingService)
+	documentService := documents.NewService(service, memberService, dogService, vetService, files, breedingService, eventService)
 	return newApp(cfg, logger, pool.Ping, func() { _ = files.Close(); pool.Close() }, authHandler,
 		members.NewHandler(memberService, authHandler), dogs.NewHandler(dogService, authHandler), veterinary.NewHandler(vetService, authHandler), breeding.NewHandler(breedingService, authHandler), events.NewHandler(eventService, authHandler), documents.NewHandler(documentService, authHandler)), nil
 }

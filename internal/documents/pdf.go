@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-fonts/dejavu/dejavusans"
 	"github.com/go-fonts/dejavu/dejavusansbold"
@@ -42,7 +43,7 @@ func render(s sourceSnapshot, kind string) ([]byte, error) {
 		p.MultiCell(0, 5.5, value, "", "L", false)
 		p.Ln(2)
 	}
-	title := map[string]string{"member_card": "Карточка члена клуба", "dog_card": "Карточка собаки", "veterinary_conclusion": "Ветеринарное заключение", "registration_certificate": "Свидетельство о регистрации собаки", "breeding_conclusion": "Заключение о вязке", "litter_act": "Акт о регистрации помёта"}[kind]
+	title := map[string]string{"member_card": "Карточка члена клуба", "dog_card": "Карточка собаки", "veterinary_conclusion": "Ветеринарное заключение", "registration_certificate": "Свидетельство о регистрации собаки", "breeding_conclusion": "Заключение о вязке", "litter_act": "Акт о регистрации помёта", "event_participants": "Список участников мероприятия", "event_protocol": "Итоговый протокол мероприятия", "event_diploma": "Диплом участника"}[kind]
 	p.SetFont("DejaVu", "B", 17)
 	p.MultiCell(0, 8, title, "", "L", false)
 	p.Ln(4)
@@ -168,6 +169,75 @@ func render(s sourceSnapshot, kind string) ([]byte, error) {
 			}
 			field("Подпись уполномоченного сотрудника", "________________________________")
 		}
+	}
+	if s.Event != nil {
+		e := s.Event
+		field("Мероприятие", e.Name+"; "+e.Type)
+		if e.Timezone != nil {
+			loc, err := time.LoadLocation(*e.Timezone)
+			if err != nil {
+				return nil, ErrUnavailable
+			}
+			period := []string{}
+			for _, t := range []*time.Time{e.StartsAt, e.EndsAt} {
+				if t != nil {
+					period = append(period, t.In(loc).Format("02.01.2006 15:04 -07:00"))
+				}
+			}
+			field("Период и часовой пояс", strings.Join(period, " — ")+"; "+*e.Timezone)
+		}
+		if s.Recipient != nil {
+			field("Получатель — владелец", s.Recipient.FullName)
+		}
+		if kind == "event_participants" {
+			for _, people := range []bool{false, true} {
+				heading := "Собаки и представители"
+				if people {
+					heading = "Участники без собак"
+				}
+				count := 0
+				for _, entry := range e.Entries {
+					if (entry.Dog == nil) == people {
+						count++
+					}
+				}
+				field(heading, fmt.Sprintf("Регистраций: %d", count))
+				for _, entry := range e.Entries {
+					if (entry.Dog == nil) != people {
+						continue
+					}
+					label := fmt.Sprintf("Регистрация № %d", entry.ID)
+					if entry.Dog != nil {
+						field(label, entry.Dog.Nickname+"; "+join(entry.Dog.Identifier.Type.Name, entry.Dog.Identifier.Number)+"; "+entry.Class)
+						field("Представитель", entry.Participant)
+					} else {
+						field(label, entry.Participant)
+					}
+				}
+			}
+		} else {
+			if len(e.Entries) == 0 {
+				field("Результаты", "Участвовавших собак нет")
+			}
+			for _, entry := range e.Entries {
+				if entry.Dog != nil {
+					field("Собака", entry.Dog.Nickname+"; "+entry.Dog.Breed.Name+"; "+join(entry.Dog.Identifier.Type.Name, entry.Dog.Identifier.Number))
+				}
+				field("Класс", entry.Class)
+				if entry.Result == nil {
+					field("Результат", "Не внесён")
+					continue
+				}
+				r := entry.Result
+				field("Основание", fmt.Sprintf("Результат № %d; регистрация № %d", r.ID, entry.ID))
+				field("Оценка", r.Grade)
+				if r.Place != nil {
+					field("Место", strconv.Itoa(int(*r.Place)))
+				}
+				field("Эксперт", r.ExpertName)
+			}
+		}
+		field("Подпись ответственного организатора", "________________________________")
 	}
 	var out bytes.Buffer
 	if err := p.Output(&out); err != nil {

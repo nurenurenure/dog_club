@@ -63,7 +63,7 @@ func TestDocumentsRegistryFilesFormsAndRevocation(t *testing.T) {
 	files, err := filestore.New(fileRoot)
 	must(err)
 	defer files.Close()
-	s := NewService(a, m, d, v, files)
+	s := NewService(a, m, d, v, files, nil, nil)
 	s.now = func() time.Time { return time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC) }
 	password := "Documents integration password 123!"
 	_, err = a.Bootstrap(ctx, "admin", "admin@documents.test")
@@ -126,7 +126,7 @@ func TestDocumentsRegistryFilesFormsAndRevocation(t *testing.T) {
 	dog := newDog("DOC-0001", "2023-03-01", person.ID)
 	types, err := s.Types(ctx, staff)
 	must(err)
-	if len(types) != 11 {
+	if len(types) != 13 {
 		t.Fatal("document types missing")
 	}
 	typeID := func(name string) int32 {

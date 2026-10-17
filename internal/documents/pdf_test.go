@@ -8,9 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"dogclub.local/backend/internal/breeding"
 	"dogclub.local/backend/internal/dogs"
+	"dogclub.local/backend/internal/events"
 	"dogclub.local/backend/internal/members"
 	"dogclub.local/backend/internal/veterinary"
 )
@@ -81,7 +83,7 @@ func TestBreedingFormsLongLitterAndV1SourceCompatibility(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{"breeding_decision_id", "litter_id", "registration_date", "breeding", "expert_name"} {
+	for _, field := range []string{"breeding_decision_id", "litter_id", "registration_date", "breeding", "expert_name", "event", "event_id", "event_result_id"} {
 		if bytes.Contains(data, []byte(`"`+field+`"`)) {
 			t.Fatal("new empty fields would mark old PDF sources stale")
 		}
@@ -103,6 +105,33 @@ func TestBreedingFormsLongLitterAndV1SourceCompatibility(t *testing.T) {
 		}
 		if err = os.WriteFile(filepath.Join(dir, "litter_act_long.pdf"), data, 0600); err != nil {
 			t.Fatal(err)
+		}
+	}
+}
+
+func TestEventPDFFormsPaginationAndCyrillic(t *testing.T) {
+	start := time.Date(2024, 2, 29, 17, 30, 0, 0, time.UTC)
+	src := sourceSnapshot{Document: Input{Number: "КЛ-2024/01", Issuer: "Клуб собаководства", IssueDate: ptr("2024-03-03")}, Recipient: &members.EventParticipant{FullName: "Анна Иванова"}, Event: &events.DocumentSource{EventID: 1, Name: "Клубная выставка", Type: "Выставка", StartsAt: &start, EndsAt: &start, Timezone: ptr("Asia/Barnaul"), Status: "completed", Entries: []events.DocumentEntry{}}}
+	for i := range 80 {
+		dog := dogs.Summary{Nickname: fmt.Sprintf("Длинная кличка собаки LONG-DOG-%d", i+1), Breed: dogs.Dictionary{Name: "Немецкая овчарка"}, Identifier: dogs.Identifier{Number: fmt.Sprintf("CHIP-%d", i+1)}}
+		src.Event.Entries = append(src.Event.Entries, events.DocumentEntry{ID: int64(i + 1), Participant: "Иван Петров", Dog: &dog, Class: "Открытый класс", Result: &events.DocumentResult{ID: int32(i + 1), Grade: "Отлично", Place: ptr(int32(1)), ExpertName: "Мария Соколова"}})
+	}
+	src.Event.Entries = append(src.Event.Entries, events.DocumentEntry{ID: 81, Participant: "Участник без собаки"})
+	for _, kind := range []string{"event_participants", "event_protocol", "event_diploma"} {
+		data, err := render(src, kind)
+		if err != nil || !bytes.HasPrefix(data, []byte("%PDF-")) {
+			t.Fatal("event PDF failed", err)
+		}
+		if bytes.Count(data, []byte("/Type /Page\n")) < 2 {
+			t.Fatal("long form not paginated")
+		}
+		if dir := os.Getenv("DOGCLUB_PDF_TEST_DIR"); dir != "" {
+			if err := os.MkdirAll(dir, 0700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, kind+"_long.pdf"), data, 0600); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 }

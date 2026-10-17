@@ -37,10 +37,10 @@ func validate(in *Input) error {
 	if in.TypeID < 1 || !text(in.Number, 50) || !text(in.Issuer, 2000) {
 		return invalid("fields", "Проверьте тип, номер (до 50) и выдавшую организацию (до 2000 символов).")
 	}
-	if (in.DogID == nil) == (in.MemberID == nil) {
+	if in.EventID == nil && (in.DogID == nil) == (in.MemberID == nil) {
 		return invalid("subject", "Укажите либо собаку, либо человека.")
 	}
-	for _, id := range []*int32{in.DogID, in.MemberID, in.RecipientMemberID} {
+	for _, id := range []*int32{in.DogID, in.MemberID, in.RecipientMemberID, in.EventID, in.EventResultID} {
 		if id != nil && *id < 1 {
 			return invalid("subject", "Укажите положительный ID.")
 		}
@@ -69,7 +69,7 @@ func correction(c *Correction) error {
 	return nil
 }
 func validFilter(f Filter) error {
-	if f.After < 0 || f.Limit < 1 || f.Limit > 100 || f.TypeID < 0 || f.MemberID < 0 || f.DogID < 0 || !text(f.Number, 50) {
+	if f.After < 0 || f.Limit < 1 || f.Limit > 100 || f.EventID < 0 || f.TypeID < 0 || f.MemberID < 0 || f.DogID < 0 || !text(f.Number, 50) {
 		return invalid("query", "Проверьте параметры фильтра и страницы.")
 	}
 	for _, d := range []*string{f.From, f.To} {

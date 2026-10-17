@@ -127,7 +127,7 @@ func command[T any](h *Handler, create bool, fn func(context.Context, auth.Princ
 func filter(w http.ResponseWriter, r *http.Request) (Filter, bool) {
 	f := Filter{Limit: 20}
 	values := r.URL.Query()
-	for _, key := range []string{"after", "limit", "number", "type_id", "member_id", "dog_id", "from", "to"} {
+	for _, key := range []string{"after", "limit", "number", "type_id", "member_id", "dog_id", "event_id", "from", "to"} {
 		if len(values[key]) > 1 {
 			writeError(w, r, invalid("query", "Укажите каждый параметр один раз."))
 			return f, false
@@ -147,7 +147,7 @@ func filter(w http.ResponseWriter, r *http.Request) (Filter, bool) {
 			*e.target = v
 		}
 	}
-	for _, key := range []string{"limit", "type_id", "member_id", "dog_id"} {
+	for _, key := range []string{"limit", "type_id", "member_id", "dog_id", "event_id"} {
 		if raw, ok := values[key]; ok {
 			v, err := strconv.ParseInt(raw[0], 10, 32)
 			if err != nil || v < 1 {
@@ -161,6 +161,8 @@ func filter(w http.ResponseWriter, r *http.Request) (Filter, bool) {
 				f.TypeID = int32(v)
 			case "member_id":
 				f.MemberID = int32(v)
+			case "event_id":
+				f.EventID = int32(v)
 			case "dog_id":
 				f.DogID = int32(v)
 			}

@@ -19,6 +19,8 @@ func (e *ValidationError) Error() string { return "invalid document" }
 func invalid(f, m string) error          { return &ValidationError{f, m} }
 
 type Input struct {
+	EventID            *int32  `json:"event_id,omitempty"`
+	EventResultID      *int32  `json:"event_result_id,omitempty"`
 	BreedingDecisionID *int64  `json:"breeding_decision_id,omitempty"`
 	LitterID           *int64  `json:"litter_id,omitempty"`
 	Number             string  `json:"number"`
@@ -74,6 +76,7 @@ type Filter struct {
 	After    int64
 	Limit    int
 	Number   string
+	EventID  int32
 	TypeID   int32
 	MemberID int32
 	DogID    int32

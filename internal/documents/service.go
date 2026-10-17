@@ -10,6 +10,7 @@ import (
 	"dogclub.local/backend/internal/auth"
 	"dogclub.local/backend/internal/breeding"
 	"dogclub.local/backend/internal/dogs"
+	"dogclub.local/backend/internal/events"
 	"dogclub.local/backend/internal/members"
 	"dogclub.local/backend/internal/platform/filestore"
 	"dogclub.local/backend/internal/veterinary"
@@ -25,25 +26,22 @@ type Service struct {
 	files    *filestore.Store
 	now      func() time.Time
 	breeding *breeding.Service
+	events   *events.Service
 }
 
-func NewService(a *auth.Service, m *members.Service, d *dogs.Service, v *veterinary.Service, f *filestore.Store, sources ...*breeding.Service) *Service {
-	s := &Service{access: a, members: m, dogs: d, vet: v, files: f, now: time.Now}
-	if len(sources) > 0 {
-		s.breeding = sources[0]
-	}
-	return s
+func NewService(a *auth.Service, m *members.Service, d *dogs.Service, v *veterinary.Service, f *filestore.Store, b *breeding.Service, e *events.Service) *Service {
+	return &Service{access: a, members: m, dogs: d, vet: v, files: f, now: time.Now, breeding: b, events: e}
 }
 
 var readRoles = []string{"staff", "veterinarian", "leader", "owner", "expert"}
 
 func domainError(err error) error {
-	for _, e := range []error{members.ErrNotFound, dogs.ErrNotFound, veterinary.ErrNotFound, breeding.ErrNotFound} {
+	for _, e := range []error{members.ErrNotFound, dogs.ErrNotFound, veterinary.ErrNotFound, breeding.ErrNotFound, events.ErrNotFound} {
 		if errors.Is(err, e) {
 			return ErrNotFound
 		}
 	}
-	for _, e := range []error{members.ErrUnavailable, dogs.ErrUnavailable, veterinary.ErrUnavailable, filestore.ErrUnavailable, breeding.ErrUnavailable} {
+	for _, e := range []error{members.ErrUnavailable, dogs.ErrUnavailable, veterinary.ErrUnavailable, filestore.ErrUnavailable, breeding.ErrUnavailable, events.ErrUnavailable} {
 		if errors.Is(err, e) {
 			return ErrUnavailable
 		}
@@ -52,6 +50,10 @@ func domainError(err error) error {
 	var d *dogs.ValidationError
 	var v *veterinary.ValidationError
 	var b *breeding.ValidationError
+	var e *events.ValidationError
+	if errors.As(err, &e) && len(e.Fields) > 0 {
+		return invalid(e.Fields[0].Field, e.Fields[0].Message)
+	}
 	if errors.As(err, &m) || errors.As(err, &d) || errors.As(err, &v) || errors.As(err, &b) {
 		return invalid("source", "Проверьте исходные данные документа.")
 	}
@@ -98,7 +100,12 @@ func (s *Service) read(ctx context.Context, q *repository, p auth.Principal, id 
 		return Document{}, ErrNotFound
 	}
 	if p.Profile.Role == "expert" && category(d.TypeName) != "breeding" {
-		return Document{}, ErrNotFound
+		if d.EventID == nil || s.events == nil {
+			return Document{}, ErrNotFound
+		}
+		if err := s.events.DocumentAccess(ctx, q.tx, p, *d.EventID); err != nil {
+			return Document{}, hiddenEventError(err)
+		}
 	}
 	d.Expired = d.ExpiresOn != nil && *d.ExpiresOn < s.now().UTC().Format(time.DateOnly)
 	for i, f := range d.Files {
@@ -154,7 +161,7 @@ func (s *Service) Types(ctx context.Context, p auth.Principal) ([]DocumentType, 
 		if p.Profile.Role == "expert" {
 			filtered := []DocumentType{}
 			for _, item := range out {
-				if item.Category == "breeding" {
+				if item.Category == "breeding" || item.Name == "Диплом" || eventType(item.Name) {
 					filtered = append(filtered, item)
 				}
 			}
@@ -186,7 +193,15 @@ func (s *Service) List(ctx context.Context, p auth.Principal, f Filter) (Page[Do
 				return err
 			}
 		}
-		ids, err := q.list(ctx, f, own, dogIDs, p.Profile.Role == "veterinarian", p.Profile.Role == "expert")
+		assigned := []int32{}
+		if p.Profile.Role == "expert" && s.events != nil {
+			var err error
+			assigned, err = s.events.DocumentEventIDs(ctx, q.tx, p)
+			if err != nil {
+				return err
+			}
+		}
+		ids, err := q.list(ctx, f, own, dogIDs, p.Profile.Role == "veterinarian", p.Profile.Role == "expert", assigned)
 		if err != nil {
 			return err
 		}
@@ -277,6 +292,9 @@ func (s *Service) references(ctx context.Context, q *repository, p auth.Principa
 	} else if in.BreedingDecisionID != nil || in.LitterID != nil {
 		return "", invalid("basis", "Этот тип документа не использует племенные основания.")
 	}
+	if err := s.eventReferences(ctx, q, p, in, cat, types); err != nil {
+		return "", err
+	}
 	return cat, nil
 }
 func (s *Service) Create(ctx context.Context, p auth.Principal, in Input) (Document, error) {
@@ -332,7 +350,7 @@ func (s *Service) Update(ctx context.Context, p auth.Principal, id int32, in Upd
 		if before.Version != in.Version || before.Status == "void" {
 			return ErrConflict
 		}
-		if len(before.Files) > 0 && (!same(before.DogID, in.DogID) || !same(before.MemberID, in.MemberID) || !same(before.RecipientMemberID, in.RecipientMemberID) || before.TypeID != in.TypeID || !same64(before.BreedingDecisionID, in.BreedingDecisionID) || !same64(before.LitterID, in.LitterID)) {
+		if len(before.Files) > 0 && (!same(before.DogID, in.DogID) || !same(before.MemberID, in.MemberID) || !same(before.RecipientMemberID, in.RecipientMemberID) || before.TypeID != in.TypeID || !same64(before.BreedingDecisionID, in.BreedingDecisionID) || !same64(before.LitterID, in.LitterID) || !same(before.EventID, in.EventID) || !same(before.EventResultID, in.EventResultID)) {
 			return invalid("subject", "Документ с файлами нельзя переносить другому получателю, объекту или типу.")
 		}
 		cat, err := s.references(ctx, q, p, in.Input)

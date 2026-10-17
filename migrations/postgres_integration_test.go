@@ -32,7 +32,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if err := Run(ctx, "status", url, &output); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(output.String(), "pending") != 10 || scalar(t, ctx, conn,
+	if strings.Count(output.String(), "pending") != 11 || scalar(t, ctx, conn,
 		`SELECT count(*) FROM pg_tables WHERE schemaname='public'`) != 0 {
 		t.Fatal("status on an empty database must list pending migrations without creating tables")
 	}
@@ -46,19 +46,19 @@ func TestPostgresMigrations(t *testing.T) {
 			t.Fatalf("unexpected migration result: %q", output.String())
 		}
 	}
-	apply("applied 10 migration(s)\n")
+	apply("applied 11 migration(s)\n")
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 59 {
 		t.Fatalf("expected 58 application tables and Goose history, got %d", count)
 	}
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_constraint c JOIN pg_namespace n
-		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 108 {
-		t.Fatalf("expected 106 previous and 2 breeding-document FK, got %d", count)
+		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 110 {
+		t.Fatalf("expected 108 previous and 2 event-document FK, got %d", count)
 	}
 	checkSeeds(t, ctx, conn)
 	apply("applied 0 migration(s)\n")
 	output.Reset()
-	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 10 {
-		t.Fatalf("expected ten applied versions: %v %q", err, output.String())
+	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 11 {
+		t.Fatalf("expected eleven applied versions: %v %q", err, output.String())
 	}
 
 	t.Run("constraints and deletion policies", func(t *testing.T) {
@@ -168,7 +168,7 @@ func TestPostgresMigrations(t *testing.T) {
 		checkSeeds(t, ctx, conn)
 	})
 
-	for range 10 {
+	for range 11 {
 		if err := Run(ctx, "down", url, io.Discard); err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 1 {
 		t.Fatalf("full rollback must leave only Goose history, got %d tables", count)
 	}
-	apply("applied 10 migration(s)\n")
+	apply("applied 11 migration(s)\n")
 	checkSeeds(t, ctx, conn)
 }
 
@@ -442,6 +442,9 @@ func checkSeeds(t *testing.T, ctx context.Context, conn *pgx.Conn) {
 		if table == "document_type" && scalar(t, ctx, conn, `SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='dog' AND column_name='registration_date'`) > 0 {
 			count += 2
 		}
+		if table == "document_type" && scalar(t, ctx, conn, `SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='document' AND column_name='event_id'`) > 0 {
+			count += 2
+		}
 		if got := scalar(t, ctx, conn, "SELECT count(*) FROM "+pgx.Identifier{table}.Sanitize()); got != count {
 			t.Errorf("%s: expected %d seed rows, got %d", table, count, got)
 		}
@@ -589,6 +592,7 @@ func TestRegistrationUpgradeDoesNotInventDatesOrChangeLegacyDocuments(t *testing
 	if scalar(t, ctx, conn, `SELECT count(*) FROM document WHERE document_id=801 AND document_number='OLD-CERTIFICATE' AND document_given_by='Legacy issuer' AND status='active' AND version=4 AND recipient_member_id=801 AND breeding_decision_id IS NULL AND litter_id IS NULL`) != 1 {
 		t.Fatal("old document changed")
 	}
+	rollbackTo(t, ctx, url, 10)
 	if err = Run(ctx, "down", url, io.Discard); err != nil {
 		t.Fatal(err)
 	}
@@ -601,10 +605,58 @@ func TestRegistrationUpgradeDoesNotInventDatesOrChangeLegacyDocuments(t *testing
 	if _, err = conn.Exec(ctx, `UPDATE dog SET registration_date='2020-01-02' WHERE dog_id=801`); err != nil {
 		t.Fatal(err)
 	}
+	rollbackTo(t, ctx, url, 10)
 	if err = Run(ctx, "down", url, io.Discard); err == nil {
 		t.Fatal("rollback discarded confirmed date")
 	}
 	if scalar(t, ctx, conn, `SELECT count(*) FROM dog WHERE dog_id=801 AND registration_date='2020-01-02'`) != 1 {
 		t.Fatal("failed rollback lost date")
+	}
+}
+
+func TestEventDocumentsUpgradePreservesExistingDiplomasAndProtectsBasis(t *testing.T) {
+	ctx, url, conn := testDatabase(t)
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	rollbackTo(t, ctx, url, 10)
+	_, err := conn.Exec(ctx, `INSERT INTO club_member(club_member_id,club_member_full_name,membership_status_id) VALUES(901,'Existing owner',1);
+ INSERT INTO dog(dog_id,dog_nickname,dog_date_of_birth,dog_identifier_number,dog_status_id,identifier_type_id,dog_breed_id,coat_color_id,sex_id) VALUES(901,'Existing dog','2020-01-01','DOC-EVENT-901',1,1,1,1,1);
+ INSERT INTO document(document_id,document_type_id,document_number,dog_id,recipient_member_id,category,status,version) VALUES(901,6,'OLD-DIPLOMA',901,901,'general','active',3)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM document WHERE document_id=901 AND event_id IS NULL AND event_result_id IS NULL AND version=3 AND document_number='OLD-DIPLOMA'`) != 1 {
+		t.Fatal("old diploma relinked or changed")
+	}
+	if err = Run(ctx, "down", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if err = Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	_, err = conn.Exec(ctx, `INSERT INTO event(event_id,event_type_id,event_name) VALUES(901,1,'Existing event');
+ INSERT INTO document(document_number,document_type_id,event_id,category,status) SELECT 'EVENT-LIST',document_type_id,901,'general','active' FROM document_type WHERE document_type_name='Список участников мероприятия'`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sql := range []string{
+		`INSERT INTO document(document_type_id,event_id,subject_member_id,category,status) VALUES(6,901,901,'general','active')`,
+		`INSERT INTO document(document_type_id,event_id,dog_id,recipient_member_id,category,status) VALUES(6,901,901,901,'general','active')`,
+		`INSERT INTO document(document_type_id,event_id,category,status) VALUES(6,999999,'general','active')`,
+		`INSERT INTO document(document_type_id,event_id,category,status) VALUES(6,901,'medical','active')`,
+	} {
+		if _, err = conn.Exec(ctx, sql); err == nil {
+			t.Fatal("invalid event basis accepted")
+		}
+	}
+	if err = Run(ctx, "down", url, io.Discard); err == nil {
+		t.Fatal("rollback discarded event basis")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM document`) != 2 {
+		t.Fatal("failed rollback changed documents")
 	}
 }

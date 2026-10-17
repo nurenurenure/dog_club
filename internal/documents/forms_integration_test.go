@@ -58,7 +58,7 @@ func TestRegistrationAndBreedingDocumentForms(t *testing.T) {
 	must(err)
 	defer files.Close()
 	b := breeding.NewService(a, d, v)
-	s := NewService(a, m, d, v, files, b)
+	s := NewService(a, m, d, v, files, b, nil)
 	s.now = func() time.Time { return time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC) }
 	password := "Documents integration password 123!"
 	_, err = a.Bootstrap(ctx, "admin", "admin@documents.test")
