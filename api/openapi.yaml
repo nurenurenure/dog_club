@@ -215,6 +215,28 @@ components:
                     $ref: '#/components/headers/NoStore'
                 X-Request-ID:
                     $ref: '#/components/headers/RequestID'
+        VeterinaryConflict:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Устаревшая версия или запись уже отмечена недействительной. Все изменения транзакции откатываются.
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        VeterinaryUnavailable:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Ветеринарное хранилище временно недоступно.
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
     schemas:
         ActivateInput:
             additionalProperties: false
@@ -1093,6 +1115,824 @@ components:
                 - login
                 - password
             type: object
+        MedicalAdmission:
+            additionalProperties: false
+            properties:
+                clearance_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                decision:
+                    enum:
+                        - allowed
+                        - denied
+                        - not_assessed
+                        - review_required
+                    type: string
+                reasons:
+                    items:
+                        $ref: '#/components/schemas/MedicalStatusReason'
+                    type: array
+                valid_until:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+            required:
+                - decision
+                - clearance_id
+                - valid_until
+                - reasons
+            type: object
+        MedicalAuthor:
+            additionalProperties: false
+            properties:
+                member_id:
+                    format: int32
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                profile_id:
+                    type:
+                        - string
+                        - "null"
+                user_id:
+                    type:
+                        - string
+                        - "null"
+            required:
+                - user_id
+                - profile_id
+                - member_id
+            type: object
+        MedicalChange:
+            additionalProperties: false
+            properties:
+                action:
+                    enum:
+                        - created
+                        - corrected
+                        - voided
+                    type: string
+                actor_profile_id:
+                    type: string
+                actor_user_id:
+                    type: string
+                after:
+                    oneOf:
+                        - $ref: '#/components/schemas/MedicalExamination'
+                        - $ref: '#/components/schemas/MedicalVaccination'
+                        - $ref: '#/components/schemas/MedicalClearance'
+                        - $ref: '#/components/schemas/MedicalVaccineType'
+                before:
+                    anyOf:
+                        - $ref: '#/components/schemas/MedicalExamination'
+                        - $ref: '#/components/schemas/MedicalVaccination'
+                        - $ref: '#/components/schemas/MedicalClearance'
+                        - $ref: '#/components/schemas/MedicalVaccineType'
+                        - type: "null"
+                changed_at:
+                    format: date-time
+                    type: string
+                dog_id:
+                    format: int32
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                entity:
+                    enum:
+                        - examination
+                        - vaccination
+                        - clearance
+                        - vaccine_type
+                    type: string
+                entity_id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                reason:
+                    maxLength: 500
+                    type: string
+                request_id:
+                    type: string
+            required:
+                - id
+                - dog_id
+                - entity
+                - entity_id
+                - actor_user_id
+                - actor_profile_id
+                - action
+                - reason
+                - before
+                - after
+                - request_id
+                - changed_at
+            type: object
+        MedicalChangePage:
+            additionalProperties: false
+            properties:
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                records:
+                    items:
+                        $ref: '#/components/schemas/MedicalChange'
+                    maxItems: 100
+                    type: array
+            required:
+                - records
+                - next_after
+            type: object
+        MedicalClearance:
+            additionalProperties: false
+            properties:
+                author:
+                    $ref: '#/components/schemas/MedicalAuthor'
+                comment:
+                    type: string
+                decision:
+                    enum:
+                        - allowed
+                        - denied
+                        - not_assessed
+                    type: string
+                dog_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                examination_date:
+                    format: date
+                    type: string
+                examination_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                is_void:
+                    type: boolean
+                purpose:
+                    enum:
+                        - events
+                        - breeding
+                    type: string
+                vaccination_ids:
+                    items:
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    maxItems: 100
+                    type: array
+                    uniqueItems: true
+                valid_until:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                version:
+                    description: Версия конкретной записи, не карточки собаки.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - dog_id
+                - examination_id
+                - examination_date
+                - purpose
+                - decision
+                - valid_until
+                - comment
+                - vaccination_ids
+                - author
+                - version
+                - is_void
+            type: object
+        MedicalClearanceInput:
+            additionalProperties: false
+            oneOf:
+                - properties:
+                    decision:
+                        const: allowed
+                    vaccination_ids:
+                        minItems: 1
+                        type: array
+                    valid_until:
+                        format: date
+                        type: string
+                  required:
+                    - valid_until
+                    - vaccination_ids
+                - properties:
+                    decision:
+                        enum:
+                            - denied
+                            - not_assessed
+                    vaccination_ids:
+                        maxItems: 0
+                        type:
+                            - array
+                            - "null"
+                    valid_until:
+                        type: "null"
+            properties:
+                comment:
+                    maxLength: 4000
+                    type: string
+                decision:
+                    enum:
+                        - allowed
+                        - denied
+                        - not_assessed
+                    type: string
+                examination_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                purpose:
+                    enum:
+                        - events
+                        - breeding
+                    type: string
+                vaccination_ids:
+                    items:
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    maxItems: 100
+                    type:
+                        - array
+                        - "null"
+                    uniqueItems: true
+                valid_until:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+            required:
+                - examination_id
+                - purpose
+                - decision
+            type: object
+        MedicalClearancePage:
+            additionalProperties: false
+            properties:
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                records:
+                    items:
+                        $ref: '#/components/schemas/MedicalClearance'
+                    maxItems: 100
+                    type: array
+            required:
+                - records
+                - next_after
+            type: object
+        MedicalClearanceUpdate:
+            additionalProperties: false
+            oneOf:
+                - properties:
+                    decision:
+                        const: allowed
+                    vaccination_ids:
+                        minItems: 1
+                        type: array
+                    valid_until:
+                        format: date
+                        type: string
+                  required:
+                    - valid_until
+                    - vaccination_ids
+                - properties:
+                    decision:
+                        enum:
+                            - denied
+                            - not_assessed
+                    vaccination_ids:
+                        maxItems: 0
+                        type:
+                            - array
+                            - "null"
+                    valid_until:
+                        type: "null"
+            properties:
+                comment:
+                    maxLength: 4000
+                    type: string
+                decision:
+                    enum:
+                        - allowed
+                        - denied
+                        - not_assessed
+                    type: string
+                examination_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                purpose:
+                    enum:
+                        - events
+                        - breeding
+                    type: string
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                vaccination_ids:
+                    items:
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    maxItems: 100
+                    type:
+                        - array
+                        - "null"
+                    uniqueItems: true
+                valid_until:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                version:
+                    description: Версия конкретной записи, не карточки собаки.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - examination_id
+                - purpose
+                - decision
+                - version
+                - reason
+            type: object
+        MedicalCorrectionInput:
+            additionalProperties: false
+            properties:
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    description: Версия конкретной записи, не карточки собаки.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+            type: object
+        MedicalDiagnosis:
+            additionalProperties: false
+            properties:
+                disease:
+                    $ref: '#/components/schemas/MedicalDisease'
+                is_hereditary:
+                    type:
+                        - boolean
+                        - "null"
+            required:
+                - disease
+                - is_hereditary
+            type: object
+        MedicalDiagnosisInput:
+            additionalProperties: false
+            properties:
+                disease_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                is_hereditary:
+                    description: null/пропуск — не установлено; false — нет; true — да.
+                    type:
+                        - boolean
+                        - "null"
+            required:
+                - disease_id
+            type: object
+        MedicalDictionaries:
+            additionalProperties: false
+            properties:
+                diseases:
+                    items:
+                        $ref: '#/components/schemas/MedicalDisease'
+                    type: array
+                vaccine_types:
+                    items:
+                        $ref: '#/components/schemas/MedicalVaccineType'
+                    type: array
+            required:
+                - diseases
+                - vaccine_types
+            type: object
+        MedicalDisease:
+            additionalProperties: false
+            properties:
+                description:
+                    type: string
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                name:
+                    type: string
+            required:
+                - id
+                - name
+                - description
+            type: object
+        MedicalExamination:
+            additionalProperties: false
+            properties:
+                author:
+                    $ref: '#/components/schemas/MedicalAuthor'
+                date:
+                    format: date
+                    type: string
+                description:
+                    type: string
+                diagnoses:
+                    items:
+                        $ref: '#/components/schemas/MedicalDiagnosis'
+                    type: array
+                dog_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                is_void:
+                    type: boolean
+                recommendations:
+                    type: string
+                result:
+                    type: string
+                version:
+                    description: Версия конкретной записи, не карточки собаки.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - dog_id
+                - date
+                - author
+                - version
+                - is_void
+                - description
+                - result
+                - recommendations
+                - diagnoses
+            type: object
+        MedicalExaminationInput:
+            additionalProperties: false
+            properties:
+                date:
+                    format: date
+                    type: string
+                description:
+                    maxLength: 4000
+                    type: string
+                diagnoses:
+                    items:
+                        $ref: '#/components/schemas/MedicalDiagnosisInput'
+                    maxItems: 100
+                    type:
+                        - array
+                        - "null"
+                recommendations:
+                    maxLength: 4000
+                    type: string
+                result:
+                    maxLength: 4000
+                    type: string
+            required:
+                - date
+            type: object
+        MedicalExaminationPage:
+            additionalProperties: false
+            properties:
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                records:
+                    items:
+                        $ref: '#/components/schemas/MedicalExamination'
+                    maxItems: 100
+                    type: array
+            required:
+                - records
+                - next_after
+            type: object
+        MedicalExaminationUpdate:
+            additionalProperties: false
+            properties:
+                date:
+                    format: date
+                    type: string
+                description:
+                    maxLength: 4000
+                    type: string
+                diagnoses:
+                    items:
+                        $ref: '#/components/schemas/MedicalDiagnosisInput'
+                    maxItems: 100
+                    type:
+                        - array
+                        - "null"
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                recommendations:
+                    maxLength: 4000
+                    type: string
+                result:
+                    maxLength: 4000
+                    type: string
+                version:
+                    description: Версия конкретной записи, не карточки собаки.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - date
+                - version
+                - reason
+            type: object
+        MedicalPeriod:
+            additionalProperties: false
+            properties:
+                unit:
+                    enum:
+                        - days
+                        - months
+                    type: string
+                value:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            required:
+                - value
+                - unit
+            type: object
+        MedicalStatus:
+            additionalProperties: false
+            properties:
+                as_of:
+                    format: date
+                    type: string
+                breeding:
+                    $ref: '#/components/schemas/MedicalAdmission'
+                dog_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                events:
+                    $ref: '#/components/schemas/MedicalAdmission'
+            required:
+                - dog_id
+                - as_of
+                - events
+                - breeding
+            type: object
+        MedicalStatusReason:
+            additionalProperties: false
+            properties:
+                code:
+                    enum:
+                        - clearance_missing
+                        - clearance_voided
+                        - examination_voided
+                        - denied
+                        - not_assessed
+                        - clearance_validity_unknown
+                        - clearance_expired
+                        - clearance_before_examination
+                        - vaccinations_missing
+                        - vaccination_voided
+                        - vaccination_after_examination
+                        - vaccination_validity_unknown
+                        - vaccination_expired
+                        - vaccination_expired_at_examination
+                    type: string
+                vaccination_id:
+                    format: int32
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+            required:
+                - code
+                - vaccination_id
+            type: object
+        MedicalVaccination:
+            additionalProperties: false
+            properties:
+                author:
+                    $ref: '#/components/schemas/MedicalAuthor'
+                date:
+                    format: date
+                    type: string
+                dog_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                is_void:
+                    type: boolean
+                next_date:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                vaccine:
+                    $ref: '#/components/schemas/MedicalVaccineType'
+                valid_until:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                version:
+                    description: Версия конкретной записи, не карточки собаки.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - dog_id
+                - date
+                - author
+                - version
+                - is_void
+                - valid_until
+                - next_date
+                - vaccine
+            type: object
+        MedicalVaccinationInput:
+            additionalProperties: false
+            properties:
+                date:
+                    format: date
+                    type: string
+                vaccine_type_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+            required:
+                - date
+                - vaccine_type_id
+            type: object
+        MedicalVaccinationPage:
+            additionalProperties: false
+            properties:
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                records:
+                    items:
+                        $ref: '#/components/schemas/MedicalVaccination'
+                    maxItems: 100
+                    type: array
+            required:
+                - records
+                - next_after
+            type: object
+        MedicalVaccinationUpdate:
+            additionalProperties: false
+            properties:
+                date:
+                    format: date
+                    type: string
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                vaccine_type_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                version:
+                    description: Версия конкретной записи, не карточки собаки.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - date
+                - vaccine_type_id
+                - version
+                - reason
+            type: object
+        MedicalVaccineType:
+            additionalProperties: false
+            properties:
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                maker:
+                    type: string
+                name:
+                    type: string
+                revaccination:
+                    anyOf:
+                        - $ref: '#/components/schemas/MedicalPeriod'
+                        - type: "null"
+                validity:
+                    anyOf:
+                        - $ref: '#/components/schemas/MedicalPeriod'
+                        - type: "null"
+                version:
+                    description: Версия конкретной записи, не карточки собаки.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - name
+                - maker
+                - validity
+                - revaccination
+                - version
+            type: object
+        MedicalVaccineTypeInput:
+            additionalProperties: false
+            properties:
+                maker:
+                    maxLength: 100
+                    type: string
+                name:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                revaccination:
+                    $ref: '#/components/schemas/MedicalPeriod'
+                validity:
+                    $ref: '#/components/schemas/MedicalPeriod'
+            required:
+                - name
+                - validity
+                - revaccination
+            type: object
+        MedicalVaccineTypeUpdate:
+            additionalProperties: false
+            properties:
+                maker:
+                    maxLength: 100
+                    type: string
+                name:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                revaccination:
+                    $ref: '#/components/schemas/MedicalPeriod'
+                validity:
+                    $ref: '#/components/schemas/MedicalPeriod'
+                version:
+                    description: Версия конкретной записи, не карточки собаки.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - name
+                - validity
+                - revaccination
+                - version
+                - reason
+            type: object
         Member:
             additionalProperties: false
             properties:
@@ -1513,6 +2353,8 @@ components:
                         - members_unavailable
                         - dog_conflict
                         - dogs_unavailable
+                        - veterinary_conflict
+                        - veterinary_unavailable
                     type: string
                 detail:
                     description: Безопасное описание ошибки без внутренних технических деталей
@@ -1664,9 +2506,9 @@ components:
             name: dogclub_refresh
             type: apiKey
 info:
-    description: 'Этапы 04–06: аккаунты с переключаемыми профилями, члены клуба и собаки. Один активный профиль на сессию, права не объединяются. Access JWT 10 минут, refresh cookie 7 дней, проверка PostgreSQL. Staff регистрирует собак только с уникальным идентификатором; leader читает всех, активный owner — только своих. Неактивное членство закрывает разделы владельца; другие профили и account controls сохраняются. Родители: карточка, внешние сведения у потомка или неизвестный. Проверяются ссылки, пол/возраст и циклы. Изменения версионируются и атомарно сохраняют историю. Титулы не истекают автоматически; исправления требуют причины. JSON до 16 КиБ, RFC 9457, same-origin policy, локальный Mailpit. Ветеринария, племенная работа и файлы документов — последующие этапы.'
+    description: 'Этапы 04–07: аккаунты с одним активным профилем, члены клуба, собаки и ветеринарный учёт. Медицинские сведения вносит ветеринар. Владелец читает текущих своих собак при активном членстве; staff/leader читают всех. Два периода препарата, снимки параметров вакцинации, заключения для мероприятий и вязки с проверкой оснований. Версии, причины исправлений и атомарная история. JSON до 16 КиБ, RFC 9457. Племенные процессы, мероприятия, документы и уведомления — последующие этапы.'
     title: Клуб собаководства — backend
-    version: 0.6.0
+    version: 0.7.0
 openapi: 3.1.1
 paths:
     /api/v1/auth/activate:
@@ -2322,6 +3164,614 @@ paths:
             summary: 'Изменение полей и проверка родословных потомков: staff'
             tags:
                 - Dogs
+    /api/v1/dogs/{dogID}/clearances:
+        get:
+            operationId: listMedicalClearances
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalClearancePage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Список записей; owner читает текущую свою собаку
+            tags:
+                - Veterinary
+        post:
+            operationId: createMedicalClearance
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MedicalClearanceInput'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalClearance'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Создать медицинскую запись: ветеринар'
+            tags:
+                - Veterinary
+    /api/v1/dogs/{dogID}/clearances/{clearanceID}:
+        get:
+            operationId: getMedicalClearance
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: clearanceID
+                  required: true
+                  schema:
+                    format: int64
+                    maximum: 9223372036854776000
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalClearance'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Медицинская запись этой собаки
+            tags:
+                - Veterinary
+        put:
+            operationId: correctMedicalClearance
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: clearanceID
+                  required: true
+                  schema:
+                    format: int64
+                    maximum: 9223372036854776000
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MedicalClearanceUpdate'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalClearance'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Исправить собственную запись с причиной: ветеринар'
+            tags:
+                - Veterinary
+    /api/v1/dogs/{dogID}/clearances/{clearanceID}/void:
+        post:
+            operationId: voidMedicalClearance
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: clearanceID
+                  required: true
+                  schema:
+                    format: int64
+                    maximum: 9223372036854776000
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MedicalCorrectionInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalClearance'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Отметить собственную запись недействительной с причиной
+            tags:
+                - Veterinary
+    /api/v1/dogs/{dogID}/examinations:
+        get:
+            operationId: listMedicalExaminations
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalExaminationPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Список записей; owner читает текущую свою собаку
+            tags:
+                - Veterinary
+        post:
+            operationId: createMedicalExamination
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MedicalExaminationInput'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalExamination'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Создать медицинскую запись: ветеринар'
+            tags:
+                - Veterinary
+    /api/v1/dogs/{dogID}/examinations/{examinationID}:
+        get:
+            operationId: getMedicalExamination
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: examinationID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalExamination'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Медицинская запись этой собаки
+            tags:
+                - Veterinary
+        put:
+            operationId: correctMedicalExamination
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: examinationID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MedicalExaminationUpdate'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalExamination'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Исправить собственную запись с причиной: ветеринар'
+            tags:
+                - Veterinary
+    /api/v1/dogs/{dogID}/examinations/{examinationID}/void:
+        post:
+            operationId: voidMedicalExamination
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: examinationID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MedicalCorrectionInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalExamination'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Отметить собственную запись недействительной с причиной
+            tags:
+                - Veterinary
     /api/v1/dogs/{dogID}/history:
         get:
             operationId: getDogHistory
@@ -2386,6 +3836,56 @@ paths:
             summary: История с доступом по текущим владельцам
             tags:
                 - Dogs
+    /api/v1/dogs/{dogID}/medical-status:
+        get:
+            description: Отдельно events/breeding. Даты включительны. Истёкшее/недействительное последнее заключение не возрождает старое разрешение. Учитываются только явно выбранные основания. Итоговые правила мероприятия и вязки добавляются их модулями.
+            operationId: getMedicalStatus
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalStatus'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Медицинская часть допуска по последним заключениям
+            tags:
+                - Veterinary
     /api/v1/dogs/{dogID}/owners:
         put:
             description: Минимум один существующий член клуба; аккаунт и активное членство для записи владения не обязательны. Доступ определяется текущим составом владельцев при каждом запросе.
@@ -2679,6 +4179,374 @@ paths:
             summary: 'Исправить дату/основание записи титула с причиной: staff'
             tags:
                 - Dogs
+    /api/v1/dogs/{dogID}/vaccinations:
+        get:
+            operationId: listMedicalVaccinations
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalVaccinationPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Список записей; owner читает текущую свою собаку
+            tags:
+                - Veterinary
+        post:
+            operationId: createMedicalVaccination
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MedicalVaccinationInput'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalVaccination'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Создать медицинскую запись: ветеринар'
+            tags:
+                - Veterinary
+    /api/v1/dogs/{dogID}/vaccinations/{vaccinationID}:
+        get:
+            operationId: getMedicalVaccination
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: vaccinationID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalVaccination'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Медицинская запись этой собаки
+            tags:
+                - Veterinary
+        put:
+            operationId: correctMedicalVaccination
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: vaccinationID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MedicalVaccinationUpdate'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalVaccination'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Исправить собственную запись с причиной: ветеринар'
+            tags:
+                - Veterinary
+    /api/v1/dogs/{dogID}/vaccinations/{vaccinationID}/void:
+        post:
+            operationId: voidMedicalVaccination
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: vaccinationID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MedicalCorrectionInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalVaccination'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Отметить собственную запись недействительной с причиной
+            tags:
+                - Veterinary
+    /api/v1/dogs/{dogID}/veterinary-history:
+        get:
+            operationId: getVeterinaryHistory
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalChangePage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: История медицинских изменений собаки
+            tags:
+                - Veterinary
     /api/v1/invitations:
         post:
             description: Требуется действующий активный профиль admin; другие назначенные профили не дают этих прав.
@@ -3823,6 +5691,350 @@ paths:
             security:
                 - bearerAuth: []
             summary: Включение/отключение профиля с изменением версии доступа
+    /api/v1/vaccine-types:
+        post:
+            operationId: createVaccineType
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MedicalVaccineTypeInput'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalVaccineType'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Добавить препарат с двумя периодами: ветеринар'
+            tags:
+                - Veterinary
+    /api/v1/vaccine-types/{typeID}:
+        get:
+            operationId: getVaccineType
+            parameters:
+                - in: path
+                  name: typeID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalVaccineType'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Препарат; неизвестные старые единицы не угадываются
+            tags:
+                - Veterinary
+        put:
+            description: Изменение каталога не пересчитывает ранее записанные вакцинации.
+            operationId: updateVaccineType
+            parameters:
+                - in: path
+                  name: typeID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/MedicalVaccineTypeUpdate'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalVaccineType'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Исправить препарат с причиной: ветеринар'
+            tags:
+                - Veterinary
+    /api/v1/vaccine-types/{typeID}/history:
+        get:
+            operationId: getVaccineTypeHistory
+            parameters:
+                - in: path
+                  name: typeID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalChangePage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'История справочника: veterinarian, staff, leader'
+            tags:
+                - Veterinary
+    /api/v1/veterinary-dictionaries:
+        get:
+            operationId: getVeterinaryDictionaries
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/MedicalDictionaries'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Заболевания и препараты; owner требует активного членства
+            tags:
+                - Veterinary
+    /api/v1/veterinary/dogs:
+        get:
+            operationId: listVeterinaryPatients
+            parameters:
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: breed_id
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: status_id
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: owner_id
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: q
+                  schema:
+                    maxLength: 100
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DogPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/VeterinaryConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/VeterinaryUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Поиск собак для ветеринарного учёта; owner ограничен своими
+            tags:
+                - Veterinary
     /health/live:
         get:
             operationId: getLiveness

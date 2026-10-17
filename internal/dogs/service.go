@@ -17,11 +17,55 @@ import (
 type Service struct {
 	access  *auth.Service
 	members *members.Service
+	dates   MedicalDatesPolicy
 	now     func() time.Time
 }
 
-func NewService(access *auth.Service, memberService *members.Service) *Service {
-	return &Service{access, memberService, time.Now}
+// MedicalDatesPolicy is supplied by the veterinary module at composition time.
+// It reads that module's data in the current transaction without an import cycle.
+type MedicalDatesPolicy interface {
+	RecordsBefore(context.Context, pgx.Tx, int32, string) (bool, error)
+}
+
+func NewService(access *auth.Service, memberService *members.Service, policies ...MedicalDatesPolicy) *Service {
+	s := &Service{access: access, members: memberService, now: time.Now}
+	if len(policies) > 0 {
+		s.dates = policies[0]
+	}
+	return s
+}
+
+// ReadForVeterinary exposes the animal's summary, never owners' personal data.
+// The caller must own auth.WithAccess and pass its current principal/transaction.
+func (s *Service) ReadForVeterinary(ctx context.Context, tx pgx.Tx, p auth.Principal, id int32) (Summary, error) {
+	if err := auth.RequireProfile(p, "veterinarian", "staff", "leader", "owner"); err != nil {
+		return Summary{}, err
+	}
+	if err := s.readAccess(ctx, tx, p, id); err != nil {
+		return Summary{}, err
+	}
+	return (&repository{tx}).summary(ctx, id)
+}
+
+func (s *Service) ListForVeterinary(ctx context.Context, tx pgx.Tx, p auth.Principal, f Filter) (Page, error) {
+	if err := auth.RequireProfile(p, "veterinarian", "staff", "leader", "owner"); err != nil {
+		return Page{}, err
+	}
+	f.Query = strings.TrimSpace(f.Query)
+	if f.After < 0 || f.Limit < 1 || f.Limit > 100 || f.OwnerID < 0 || f.BreedID < 0 || f.StatusID < 0 || !validText(f.Query, 100) {
+		return Page{}, invalid("query", "Проверьте параметры поиска и страницы.")
+	}
+	memberID, err := s.owner(ctx, tx, p)
+	if err != nil {
+		return Page{}, err
+	}
+	if memberID != 0 {
+		if f.OwnerID != 0 && f.OwnerID != memberID {
+			return Page{}, auth.ErrForbidden
+		}
+		f.OwnerID = memberID
+	}
+	return (&repository{tx}).list(ctx, f)
 }
 func invalid(field, message string) error {
 	return &ValidationError{Fields: []FieldError{{field, message}}}
@@ -246,6 +290,15 @@ func (s *Service) Patch(ctx context.Context, p auth.Principal, id int32, in Patc
 		}
 		if err := validateCreate(&merged, s.now()); err != nil {
 			return err
+		}
+		if s.dates != nil && merged.DateOfBirth != before.DateOfBirth {
+			exists, err := s.dates.RecordsBefore(ctx, q.tx, id, merged.DateOfBirth)
+			if err != nil {
+				return ErrUnavailable
+			}
+			if exists {
+				return invalid("date_of_birth", "Дата рождения не может быть позже действующих ветеринарных записей.")
+			}
 		}
 		if err := q.update(ctx, id, merged); err != nil {
 			return err

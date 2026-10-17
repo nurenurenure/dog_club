@@ -17,6 +17,7 @@ import (
 	"dogclub.local/backend/internal/platform/httpapi"
 	"dogclub.local/backend/internal/platform/mail"
 	"dogclub.local/backend/internal/platform/middleware"
+	"dogclub.local/backend/internal/veterinary"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 )
@@ -46,7 +47,10 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	}
 	authHandler := auth.NewHandler(service, cfg.CookieSecure)
 	memberService := members.NewService(service)
-	return newApp(cfg, logger, pool.Ping, pool.Close, authHandler, members.NewHandler(memberService, authHandler), dogs.NewHandler(dogs.NewService(service, memberService), authHandler)), nil
+	dogService := dogs.NewService(service, memberService, veterinary.DogDatesPolicy{})
+	vetService := veterinary.NewService(service, dogService, memberService)
+	return newApp(cfg, logger, pool.Ping, pool.Close, authHandler,
+		members.NewHandler(memberService, authHandler), dogs.NewHandler(dogService, authHandler), veterinary.NewHandler(vetService, authHandler)), nil
 }
 
 func newApp(cfg config.Config, logger *slog.Logger, ping func(context.Context) error, closePool func(), apiHandlers ...interface{ RegisterRoutes(chi.Router) }) *App {
