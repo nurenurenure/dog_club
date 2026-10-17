@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"slices"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"dogclub.local/backend/internal/auth"
@@ -29,14 +30,15 @@ type Mailer interface {
 	SendNotification(context.Context, string, string, string, string) error
 }
 type Service struct {
-	pool      *pgxpool.Pool
-	auth      *auth.Service
-	members   *members.Service
-	dogs      *dogs.Service
-	mail      Mailer
-	providers map[string]notify.Provider
-	scanners  map[string]notify.Scanner
-	now       func() time.Time
+	lastSuccess atomic.Int64
+	pool        *pgxpool.Pool
+	auth        *auth.Service
+	members     *members.Service
+	dogs        *dogs.Service
+	mail        Mailer
+	providers   map[string]notify.Provider
+	scanners    map[string]notify.Scanner
+	now         func() time.Time
 }
 
 func New(pool *pgxpool.Pool, a *auth.Service, m *members.Service, d *dogs.Service, mail Mailer, providers map[string]notify.Provider) *Service {
@@ -281,7 +283,12 @@ func (s *Service) finish(ctx context.Context, d delivery, status string) error {
 
 // Tick handles one bounded page per scanner and up to twenty deliveries. It is
 // safe across processes: leases and source/recipient checks are transactional.
-func (s *Service) Tick(ctx context.Context) error {
+func (s *Service) Tick(ctx context.Context) (result error) {
+	defer func() {
+		if result == nil {
+			s.lastSuccess.Store(s.now().Unix())
+		}
+	}()
 	names := make([]string, 0, len(s.scanners))
 	for n := range s.scanners {
 		names = append(names, n)

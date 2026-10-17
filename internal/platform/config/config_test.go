@@ -113,3 +113,25 @@ func env(values map[string]string) func(string) (string, bool) {
 		return value, ok
 	}
 }
+
+func TestLocalComposeIsExplicitAndMailpitOnly(t *testing.T) {
+	for _, tc := range []struct {
+		local, smtp, http string
+		want              bool
+	}{
+		{"true", "mailpit:1025", "0.0.0.0:8080", true},
+		{"false", "mailpit:1025", "127.0.0.1:8080", false},
+		{"true", "smtp.example.com:1025", "0.0.0.0:8080", false},
+		{"true", "mailpit:25", "0.0.0.0:8080", false},
+		{"true", "mailpit:1025", "example.com:8080", false},
+		{"invalid", "127.0.0.1:1025", "127.0.0.1:8080", false},
+	} {
+		cfg, err := load(env(map[string]string{"DATABASE_URL": "postgres://localhost/test", "LOCAL_COMPOSE": tc.local, "SMTP_ADDR": tc.smtp, "HTTP_ADDR": tc.http, "AUTH_COOKIE_SECURE": "false", "NOTIFICATIONS_ENABLED": "false"}))
+		if (err == nil) != tc.want {
+			t.Fatalf("compose=%s smtp=%s http=%s: %v", tc.local, tc.smtp, tc.http, err)
+		}
+		if err == nil && cfg.NotificationsEnabled {
+			t.Fatal("worker disable ignored")
+		}
+	}
+}

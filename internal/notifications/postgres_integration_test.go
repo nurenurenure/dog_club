@@ -649,3 +649,33 @@ func TestLegacyCompositeVaccinationIDsStaySeparate(t *testing.T) {
 		t.Fatal("composite cursor repeated deliveries")
 	}
 }
+
+func TestAggregateMetricsAndSuccessfulCycle(t *testing.T) {
+	f := newFixture(t)
+	initial, err := f.s.Metrics(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if initial.LastSuccessfulCycleUnix != 0 || initial.Pending != 0 || initial.Sent != 0 {
+		t.Fatal("unexpected initial aggregate")
+	}
+	if err = f.s.Tick(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	current, err := f.s.Metrics(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.LastSuccessfulCycleUnix != f.now.Unix() {
+		t.Fatal("successful cycle was not recorded")
+	}
+	ctx, cancel := context.WithCancel(f.ctx)
+	cancel()
+	if f.s.Tick(ctx) == nil {
+		t.Fatal("cancelled cycle succeeded")
+	}
+	after, err := f.s.Metrics(f.ctx)
+	if err != nil || after.LastSuccessfulCycleUnix != current.LastSuccessfulCycleUnix {
+		t.Fatal("failed cycle replaced success time")
+	}
+}

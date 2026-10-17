@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"dogclub.local/backend/internal/platform/config"
+	"dogclub.local/backend/internal/platform/middleware"
+	"github.com/go-chi/chi/v5"
 )
 
 func TestHealthRoutes(t *testing.T) {
@@ -286,5 +288,17 @@ func TestShutdownJoinsNotificationWorkerBeforePoolClose(t *testing.T) {
 	}
 	if !closed.Load() {
 		t.Fatal("pool not closed")
+	}
+}
+
+func TestMetricsUseFinalPatternsAndIncludeRecoveredFailures(t *testing.T) {
+	metrics := &middleware.HTTPMetrics{}
+	a := newAppWithMetrics(metrics, testConfig(), testLogger(), func(context.Context) error { return nil }, func() {})
+	router := a.server.Handler.(*chi.Mux)
+	router.Get("/example/{id}", func(http.ResponseWriter, *http.Request) { panic("private") })
+	a.server.Handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/example/private?secret=private", nil))
+	rows := metrics.Snapshot()
+	if len(rows) != 1 || rows[0].Route != "/example/{id}" || rows[0].ServerErrors != 1 {
+		t.Fatalf("wrong composition: %+v", rows)
 	}
 }

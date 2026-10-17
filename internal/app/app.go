@@ -16,6 +16,7 @@ import (
 	"dogclub.local/backend/internal/health"
 	"dogclub.local/backend/internal/members"
 	"dogclub.local/backend/internal/notifications"
+	"dogclub.local/backend/internal/operations"
 	"dogclub.local/backend/internal/platform/config"
 	"dogclub.local/backend/internal/platform/database"
 	"dogclub.local/backend/internal/platform/filestore"
@@ -44,7 +45,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	mailer, err := mail.NewLocalSMTP(cfg.SMTPAddr, cfg.MailFrom)
+	mailer, err := mail.NewLocalSMTP(cfg.SMTPAddr, cfg.MailFrom, cfg.LocalCompose)
 	if err != nil {
 		pool.Close()
 		return nil, err
@@ -76,15 +77,25 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	breedingService.SetNotificationSink(notifier)
 	eventService.SetNotificationSink(notifier)
 	documentService.SetNotificationSink(notifier)
-	application := newApp(cfg, logger, pool.Ping, func() { _ = files.Close(); pool.Close() }, authHandler,
-		members.NewHandler(memberService, authHandler), dogs.NewHandler(dogService, authHandler), veterinary.NewHandler(vetService, authHandler), breeding.NewHandler(breedingService, authHandler), events.NewHandler(eventService, authHandler), documents.NewHandler(documentService, authHandler), reports.NewHandler(reportService, authHandler), training.NewHandler(trainingService, authHandler))
-	application.worker = notifier.Run
+	metrics := &middleware.HTTPMetrics{}
+	application := newAppWithMetrics(metrics, cfg, logger, pool.Ping, func() { _ = files.Close(); pool.Close() }, authHandler,
+		members.NewHandler(memberService, authHandler), dogs.NewHandler(dogService, authHandler), veterinary.NewHandler(vetService, authHandler), breeding.NewHandler(breedingService, authHandler), events.NewHandler(eventService, authHandler), documents.NewHandler(documentService, authHandler), reports.NewHandler(reportService, authHandler), training.NewHandler(trainingService, authHandler), operations.NewHandler(service, authHandler, metrics, pool, notifier, cfg.NotificationsEnabled))
+	if cfg.NotificationsEnabled {
+		application.worker = notifier.Run
+	}
 	return application, nil
 }
 
 func newApp(cfg config.Config, logger *slog.Logger, ping func(context.Context) error, closePool func(), apiHandlers ...interface{ RegisterRoutes(chi.Router) }) *App {
+	return newAppWithMetrics(nil, cfg, logger, ping, closePool, apiHandlers...)
+}
+
+func newAppWithMetrics(metrics *middleware.HTTPMetrics, cfg config.Config, logger *slog.Logger, ping func(context.Context) error, closePool func(), apiHandlers ...interface{ RegisterRoutes(chi.Router) }) *App {
 	h := health.New(ping, cfg.DBPingTimeout)
 	router := chi.NewRouter()
+	if metrics != nil {
+		router.Use(metrics.Observe)
+	}
 	router.Use(chimiddleware.RequestID)
 	router.Use(middleware.RequestLog(logger))
 	router.Use(middleware.Recover(logger))

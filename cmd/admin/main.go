@@ -38,7 +38,7 @@ func run() error {
 		return err
 	}
 	defer pool.Close()
-	mailer, err := mail.NewLocalSMTP(cfg.SMTPAddr, cfg.MailFrom)
+	mailer, err := mail.NewLocalSMTP(cfg.SMTPAddr, cfg.MailFrom, cfg.LocalCompose)
 	if err != nil {
 		return err
 	}

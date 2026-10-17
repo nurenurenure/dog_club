@@ -15,9 +15,9 @@ import (
 
 type LocalSMTP struct{ Address, From string }
 
-func NewLocalSMTP(address, from string) (*LocalSMTP, error) {
+func NewLocalSMTP(address, from string, localCompose ...bool) (*LocalSMTP, error) {
 	host, _, err := net.SplitHostPort(address)
-	if err != nil || !net.ParseIP(host).IsLoopback() {
+	if err != nil || !(net.ParseIP(host).IsLoopback() || len(localCompose) == 1 && localCompose[0] && address == "mailpit:1025") {
 		return nil, fmt.Errorf("SMTP_ADDR must use a loopback IP")
 	}
 	a, err := netmail.ParseAddress(from)

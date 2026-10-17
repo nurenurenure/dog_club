@@ -12,23 +12,25 @@ import (
 )
 
 type Config struct {
-	HTTPAddr          string
-	DatabaseURL       string
-	LogLevel          slog.Level
-	ReadHeaderTimeout time.Duration
-	ReadTimeout       time.Duration
-	WriteTimeout      time.Duration
-	IdleTimeout       time.Duration
-	DBPingTimeout     time.Duration
-	ShutdownTimeout   time.Duration
-	JWTKey            []byte
-	JWTIssuer         string
-	JWTAudience       string
-	AuthIOTimeout     time.Duration
-	CookieSecure      bool
-	SMTPAddr          string
-	DocumentsDir      string
-	MailFrom          string
+	HTTPAddr             string
+	DatabaseURL          string
+	LogLevel             slog.Level
+	ReadHeaderTimeout    time.Duration
+	ReadTimeout          time.Duration
+	WriteTimeout         time.Duration
+	IdleTimeout          time.Duration
+	DBPingTimeout        time.Duration
+	ShutdownTimeout      time.Duration
+	JWTKey               []byte
+	JWTIssuer            string
+	JWTAudience          string
+	AuthIOTimeout        time.Duration
+	CookieSecure         bool
+	SMTPAddr             string
+	DocumentsDir         string
+	MailFrom             string
+	LocalCompose         bool
+	NotificationsEnabled bool
 }
 
 // Load reads only the process environment; it never loads .env files.
@@ -54,6 +56,14 @@ func load(lookup func(string) (string, bool)) (Config, error) {
 	if err != nil || len(key) < 32 {
 		return Config{}, fmt.Errorf("AUTH_JWT_KEY must be base64 containing at least 32 random bytes")
 	}
+	cfg.LocalCompose, err = strconv.ParseBool(value("LOCAL_COMPOSE", "false"))
+	if err != nil {
+		return Config{}, fmt.Errorf("LOCAL_COMPOSE must be a boolean")
+	}
+	cfg.NotificationsEnabled, err = strconv.ParseBool(value("NOTIFICATIONS_ENABLED", "true"))
+	if err != nil {
+		return Config{}, fmt.Errorf("NOTIFICATIONS_ENABLED must be a boolean")
+	}
 	cfg.JWTKey = key
 	cfg.JWTIssuer = value("AUTH_JWT_ISSUER", "dogclub.local")
 	cfg.JWTAudience = value("AUTH_JWT_AUDIENCE", "dogclub-api")
@@ -67,8 +77,8 @@ func load(lookup func(string) (string, bool)) (Config, error) {
 	cfg.SMTPAddr = value("SMTP_ADDR", "127.0.0.1:1025")
 	smtpHost, smtpPort, smtpErr := net.SplitHostPort(cfg.SMTPAddr)
 	smtpNumber, smtpNumberErr := strconv.Atoi(smtpPort)
-	if smtpErr != nil || smtpNumberErr != nil || smtpNumber < 1 || smtpNumber > 65535 || !net.ParseIP(smtpHost).IsLoopback() {
-		return Config{}, fmt.Errorf("SMTP_ADDR must use a loopback IP and a valid port")
+	if smtpErr != nil || smtpNumberErr != nil || smtpNumber < 1 || smtpNumber > 65535 || !(net.ParseIP(smtpHost).IsLoopback() || cfg.LocalCompose && smtpHost == "mailpit" && smtpNumber == 1025) {
+		return Config{}, fmt.Errorf("SMTP_ADDR must use a loopback IP and valid port, or local Compose mailpit:1025")
 	}
 	cfg.DocumentsDir = value("DOCUMENTS_DIR", "var/documents")
 	if strings.TrimSpace(cfg.DocumentsDir) == "" {
@@ -84,7 +94,7 @@ func load(lookup func(string) (string, bool)) (Config, error) {
 		return Config{}, fmt.Errorf("HTTP_ADDR must contain a port from 1 to 65535")
 	}
 	host, _, _ := net.SplitHostPort(cfg.HTTPAddr)
-	if !cfg.CookieSecure && !net.ParseIP(host).IsLoopback() {
+	if !cfg.CookieSecure && !net.ParseIP(host).IsLoopback() && !(cfg.LocalCompose && host == "0.0.0.0") {
 		return Config{}, fmt.Errorf("AUTH_COOKIE_SECURE=false requires a loopback HTTP_ADDR")
 	}
 	if err := cfg.LogLevel.UnmarshalText([]byte(value("LOG_LEVEL", "info"))); err != nil {

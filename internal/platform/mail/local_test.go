@@ -28,3 +28,15 @@ func TestNotificationRejectsInjectedMessageIDBeforeConnecting(t *testing.T) {
 		t.Fatal("message ID header injection accepted")
 	}
 }
+
+func TestComposeSMTPAllowsOnlyExplicitLocalMailpit(t *testing.T) {
+	for _, address := range []string{"mailpit:1025", "mailpit:25", "smtp.example.com:1025"} {
+		_, err := NewLocalSMTP(address, "club@dogclub.test", true)
+		if (err == nil) != (address == "mailpit:1025") {
+			t.Fatal("Compose SMTP boundary failed")
+		}
+	}
+	if _, err := NewLocalSMTP("mailpit:1025", "club@dogclub.test"); err == nil {
+		t.Fatal("implicit Compose mode")
+	}
+}
