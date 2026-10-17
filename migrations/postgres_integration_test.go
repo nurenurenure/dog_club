@@ -32,7 +32,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if err := Run(ctx, "status", url, &output); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(output.String(), "pending") != 6 || scalar(t, ctx, conn,
+	if strings.Count(output.String(), "pending") != 7 || scalar(t, ctx, conn,
 		`SELECT count(*) FROM pg_tables WHERE schemaname='public'`) != 0 {
 		t.Fatal("status on an empty database must list pending migrations without creating tables")
 	}
@@ -46,19 +46,19 @@ func TestPostgresMigrations(t *testing.T) {
 			t.Fatalf("unexpected migration result: %q", output.String())
 		}
 	}
-	apply("applied 6 migration(s)\n")
-	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 46 {
-		t.Fatalf("expected 45 application tables and Goose history, got %d", count)
+	apply("applied 7 migration(s)\n")
+	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 51 {
+		t.Fatalf("expected 50 application tables and Goose history, got %d", count)
 	}
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_constraint c JOIN pg_namespace n
-		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 69 {
-		t.Fatalf("expected 56 previous and 13 veterinary FK, got %d", count)
+		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 80 {
+		t.Fatalf("expected 69 previous and 11 breeding FK, got %d", count)
 	}
 	checkSeeds(t, ctx, conn)
 	apply("applied 0 migration(s)\n")
 	output.Reset()
-	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 6 {
-		t.Fatalf("expected six applied versions: %v %q", err, output.String())
+	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 7 {
+		t.Fatalf("expected seven applied versions: %v %q", err, output.String())
 	}
 
 	t.Run("constraints and deletion policies", func(t *testing.T) {
@@ -168,7 +168,7 @@ func TestPostgresMigrations(t *testing.T) {
 		checkSeeds(t, ctx, conn)
 	})
 
-	for range 6 {
+	for range 7 {
 		if err := Run(ctx, "down", url, io.Discard); err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 1 {
 		t.Fatalf("full rollback must leave only Goose history, got %d tables", count)
 	}
-	apply("applied 6 migration(s)\n")
+	apply("applied 7 migration(s)\n")
 	checkSeeds(t, ctx, conn)
 }
 
@@ -313,6 +313,7 @@ func TestVeterinaryUpgradePreservesUnknownLegacyFacts(t *testing.T) {
 			t.Fatal("upgrade changed legacy clinical facts or fabricated metadata")
 		}
 	}
+	rollbackTo(t, ctx, url, 6)
 	if err := Run(ctx, "down", url, io.Discard); err == nil {
 		t.Fatal("down silently removed clinical fields")
 	}
@@ -323,6 +324,47 @@ func TestVeterinaryUpgradePreservesUnknownLegacyFacts(t *testing.T) {
 	}
 	if scalar(t, ctx, conn, `SELECT count(*) FROM veterinary_changes`) != 0 {
 		t.Fatal("migration invented clinical authors/history")
+	}
+}
+
+func TestBreedingUpgradePreservesLegacyFactsAndRefusesAmbiguousIDs(t *testing.T) {
+	ctx, url, conn := testDatabase(t)
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	rollbackTo(t, ctx, url, 6)
+	_, err := conn.Exec(ctx, `INSERT INTO dog(dog_id,dog_nickname,dog_date_of_birth,dog_identifier_number,dog_status_id,identifier_type_id,dog_breed_id,coat_color_id,sex_id) VALUES
+	(401,'Legacy female','2020-01-01','BREED-401',1,1,1,1,1),
+	(402,'Legacy male','2020-01-01','BREED-402',1,1,1,1,2),
+	(403,'Legacy other female','2020-01-01','BREED-403',1,1,1,1,1);
+	INSERT INTO breeding(breeding_id,female_dog_id,male_dog_id,breeding_date,breeding_number_of_puppies,breeding_status_id) VALUES
+	(401,401,402,'2024-01-01 12:34:56.123456',4,2),(401,403,402,NULL,NULL,1);`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "up", url, io.Discard); err == nil || !strings.Contains(err.Error(), "23505") {
+		t.Fatal("migration accepted ambiguous breeding IDs")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM breeding`) != 2 || scalar(t, ctx, conn, `SELECT count(*) FROM information_schema.tables WHERE table_name='litter'`) != 0 {
+		t.Fatal("failed upgrade changed legacy rows/schema")
+	}
+	if _, err := conn.Exec(ctx, `DELETE FROM breeding WHERE female_dog_id=403`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM breeding WHERE breeding_id=401 AND breeding_date='2024-01-01 12:34:56.123456' AND breeding_number_of_puppies=4 AND request_id IS NULL AND outcome='unknown' AND assessment IS NULL`) != 1 || scalar(t, ctx, conn, `SELECT count(*) FROM litter`) != 0 || scalar(t, ctx, conn, `SELECT count(*) FROM breeding_request`) != 0 {
+		t.Fatal("migration invented litter/date/decision or changed legacy facts")
+	}
+	if _, err := conn.Exec(ctx, `INSERT INTO breeding_request(female_dog_id,male_dog_id,planned_date) VALUES(401,402,'2025-01-01')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "down", url, io.Discard); err == nil {
+		t.Fatal("rollback removed new breeding information")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM breeding_request`) != 1 {
+		t.Fatal("failed rollback lost request")
 	}
 }
 

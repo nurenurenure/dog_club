@@ -12,6 +12,28 @@ components:
                 minLength: 1
                 type: string
     responses:
+        BreedingConflict:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Версия или состояние изменились; вся операция откатывается.
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        BreedingUnavailable:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Племенное хранилище временно недоступно.
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
         AuthBadToken:
             content:
                 application/problem+json:
@@ -238,6 +260,841 @@ components:
                 X-Request-ID:
                     $ref: '#/components/headers/RequestID'
     schemas:
+        BreedingAnimal:
+            additionalProperties: false
+            properties:
+                ancestor_ids:
+                    items:
+                        format: int32
+                        maximum: 2147483647
+                        minimum: 1
+                        type: integer
+                    type: array
+                    uniqueItems: true
+                ancestry_incomplete:
+                    type: boolean
+                breed:
+                    $ref: '#/components/schemas/DogDictionary'
+                coat_color:
+                    $ref: '#/components/schemas/DogDictionary'
+                date_of_birth:
+                    format: date
+                    type: string
+                height_cm:
+                    maximum: 99999.99
+                    minimum: 0.01
+                    multipleOf: 0.01
+                    type:
+                        - number
+                        - "null"
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                identifier:
+                    $ref: '#/components/schemas/DogIdentifier'
+                nickname:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                pedigree:
+                    $ref: '#/components/schemas/DogPedigree'
+                sex:
+                    $ref: '#/components/schemas/DogDictionary'
+                status:
+                    $ref: '#/components/schemas/DogDictionary'
+                version:
+                    description: Последняя версия всей карточки собаки; обязательна для каждой мутации.
+                    format: int64
+                    minimum: 1
+                    type: integer
+                weight_kg:
+                    maximum: 99999.99
+                    minimum: 0.01
+                    multipleOf: 0.01
+                    type:
+                        - number
+                        - "null"
+            required:
+                - pedigree
+                - ancestor_ids
+                - ancestry_incomplete
+                - id
+                - nickname
+                - date_of_birth
+                - identifier
+                - status
+                - breed
+                - coat_color
+                - sex
+                - height_cm
+                - weight_kg
+                - version
+            type: object
+        BreedingAssessment:
+            additionalProperties: false
+            properties:
+                as_of:
+                    format: date
+                    type: string
+                blocking_reasons:
+                    items:
+                        enum:
+                            - same_dog
+                            - pair_sex
+                            - different_breeds
+                            - pair_birth_dates
+                            - identifier_missing
+                            - female_medical_clearance
+                            - male_medical_clearance
+                            - expected_birth_date_required
+                            - litter_interval
+                            - expected_birth_before_mating
+                            - previous_outcome_unknown
+                            - another_approved_request
+                        type: string
+                    type: array
+                common_ancestor_ids:
+                    items:
+                        format: int32
+                        maximum: 2147483647
+                        minimum: 1
+                        type: integer
+                    type: array
+                    uniqueItems: true
+                earliest_birth_date:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                female:
+                    $ref: '#/components/schemas/BreedingAnimal'
+                female_health:
+                    $ref: '#/components/schemas/BreedingHealth'
+                interval_days:
+                    const: 365
+                    type: integer
+                male:
+                    $ref: '#/components/schemas/BreedingAnimal'
+                male_health:
+                    $ref: '#/components/schemas/BreedingHealth'
+                warnings:
+                    items:
+                        enum:
+                            - known_relationship
+                            - ancestry_incomplete
+                            - hereditary_findings_require_expert
+                            - earlier_litters_not_recorded
+                        type: string
+                    type: array
+            required:
+                - as_of
+                - female
+                - male
+                - female_health
+                - male_health
+                - common_ancestor_ids
+                - earliest_birth_date
+                - blocking_reasons
+                - warnings
+                - interval_days
+            type: object
+        BreedingChange:
+            additionalProperties: false
+            properties:
+                action:
+                    type: string
+                actor_profile_id:
+                    type: string
+                actor_user_id:
+                    type: string
+                after:
+                    anyOf:
+                        - type: object
+                        - type: "null"
+                before:
+                    anyOf:
+                        - type: object
+                        - type: "null"
+                changed_at:
+                    format: date-time
+                    type: string
+                entity:
+                    enum:
+                        - request
+                        - breeding
+                        - litter
+                    type: string
+                entity_id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                reason:
+                    type: string
+                request_id:
+                    type: string
+            required:
+                - id
+                - entity
+                - entity_id
+                - actor_user_id
+                - actor_profile_id
+                - action
+                - reason
+                - before
+                - after
+                - request_id
+                - changed_at
+            type: object
+        BreedingChangePage:
+            additionalProperties: false
+            properties:
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                records:
+                    items:
+                        $ref: '#/components/schemas/BreedingChange'
+                    type: array
+            required:
+                - records
+                - next_after
+            type: object
+        BreedingCorrection:
+            additionalProperties: false
+            properties:
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+            type: object
+        BreedingDecision:
+            additionalProperties: false
+            properties:
+                actor_profile_id:
+                    type: string
+                actor_user_id:
+                    type: string
+                assessment:
+                    anyOf:
+                        - $ref: '#/components/schemas/BreedingAssessment'
+                        - type: "null"
+                decided_at:
+                    format: date-time
+                    type: string
+                decision:
+                    enum:
+                        - approved
+                        - rejected
+                    type: string
+                id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                reason:
+                    type: string
+                request_id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                request_version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - request_id
+                - request_version
+                - decision
+                - reason
+                - assessment
+                - actor_user_id
+                - actor_profile_id
+                - decided_at
+            type: object
+        BreedingDecisionInput:
+            additionalProperties: false
+            properties:
+                decision:
+                    enum:
+                        - approved
+                        - rejected
+                    type: string
+                expected_birth_date:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+                - decision
+            type: object
+        BreedingDecisionPage:
+            additionalProperties: false
+            properties:
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                records:
+                    items:
+                        $ref: '#/components/schemas/BreedingDecision'
+                    type: array
+            required:
+                - records
+                - next_after
+            type: object
+        BreedingFinding:
+            additionalProperties: false
+            properties:
+                date:
+                    format: date
+                    type: string
+                disease_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                disease_name:
+                    type: string
+                examination_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                is_hereditary:
+                    type:
+                        - boolean
+                        - "null"
+            required:
+                - examination_id
+                - date
+                - disease_id
+                - disease_name
+                - is_hereditary
+            type: object
+        BreedingHealth:
+            additionalProperties: false
+            properties:
+                admission:
+                    $ref: '#/components/schemas/MedicalAdmission'
+                as_of:
+                    format: date
+                    type: string
+                findings:
+                    items:
+                        $ref: '#/components/schemas/BreedingFinding'
+                    type: array
+            required:
+                - as_of
+                - admission
+                - findings
+            type: object
+        BreedingLinkInput:
+            additionalProperties: false
+            properties:
+                dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                dog_version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+                - dog_id
+                - dog_version
+            type: object
+        BreedingLitter:
+            additionalProperties: false
+            properties:
+                breeding_id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                date_of_birth:
+                    format: date
+                    type: string
+                dog_ids:
+                    items:
+                        format: int32
+                        maximum: 2147483647
+                        minimum: 1
+                        type: integer
+                    type: array
+                    uniqueItems: true
+                female_dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                interval_days:
+                    format: int32
+                    minimum: 0
+                    type:
+                        - integer
+                        - "null"
+                interval_violation:
+                    type: boolean
+                male_dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                previous_birth_date:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                total_puppies:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - breeding_id
+                - female_dog_id
+                - male_dog_id
+                - date_of_birth
+                - total_puppies
+                - dog_ids
+                - previous_birth_date
+                - interval_days
+                - interval_violation
+                - version
+            type: object
+        BreedingLitterInput:
+            additionalProperties: false
+            properties:
+                breeding_id:
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                date_of_birth:
+                    format: date
+                    type: string
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                total_puppies:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+                - breeding_id
+                - date_of_birth
+                - total_puppies
+            type: object
+        BreedingLitterPage:
+            additionalProperties: false
+            properties:
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                records:
+                    items:
+                        $ref: '#/components/schemas/BreedingLitter'
+                    type: array
+            required:
+                - records
+                - next_after
+            type: object
+        BreedingLitterUpdate:
+            additionalProperties: false
+            properties:
+                date_of_birth:
+                    format: date
+                    type: string
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                total_puppies:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+                - date_of_birth
+                - total_puppies
+            type: object
+        BreedingMating:
+            additionalProperties: false
+            properties:
+                assessment:
+                    anyOf:
+                        - $ref: '#/components/schemas/BreedingAssessment'
+                        - type: "null"
+                date:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                female_dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                legacy_puppy_count:
+                    format: int32
+                    type:
+                        - integer
+                        - "null"
+                male_dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                outcome:
+                    enum:
+                        - unknown
+                        - no_litter
+                        - litter
+                    type: string
+                request_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                status:
+                    $ref: '#/components/schemas/DogDictionary'
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - request_id
+                - female_dog_id
+                - male_dog_id
+                - date
+                - status
+                - outcome
+                - legacy_puppy_count
+                - assessment
+                - version
+            type: object
+        BreedingMatingInput:
+            additionalProperties: false
+            properties:
+                date:
+                    format: date
+                    type: string
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+                - date
+            type: object
+        BreedingMatingPage:
+            additionalProperties: false
+            properties:
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                records:
+                    items:
+                        $ref: '#/components/schemas/BreedingMating'
+                    type: array
+            required:
+                - records
+                - next_after
+            type: object
+        BreedingMatingUpdate:
+            additionalProperties: false
+            properties:
+                date:
+                    format: date
+                    type: string
+                outcome:
+                    enum:
+                        - unknown
+                        - no_litter
+                        - litter
+                    type: string
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+                - date
+                - outcome
+            type: object
+        BreedingPuppyInput:
+            additionalProperties: false
+            properties:
+                coat_color_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                identifier:
+                    $ref: '#/components/schemas/DogIdentifierInput'
+                nickname:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                owner_ids:
+                    items:
+                        format: int32
+                        maximum: 2147483647
+                        minimum: 1
+                        type: integer
+                    maxItems: 100
+                    minItems: 1
+                    type: array
+                    uniqueItems: true
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                sex_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                status_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+                - nickname
+                - identifier
+                - status_id
+                - coat_color_id
+                - sex_id
+                - owner_ids
+            type: object
+        BreedingRequest:
+            additionalProperties: false
+            properties:
+                assessment:
+                    anyOf:
+                        - $ref: '#/components/schemas/BreedingAssessment'
+                        - type: "null"
+                comment:
+                    maxLength: 2000
+                    type: string
+                expected_birth_date:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                female_dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                male_dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                planned_date:
+                    format: date
+                    type: string
+                status:
+                    enum:
+                        - pending
+                        - approved
+                        - rejected
+                        - cancelled
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - female_dog_id
+                - male_dog_id
+                - planned_date
+                - expected_birth_date
+                - comment
+                - status
+                - assessment
+                - version
+            type: object
+        BreedingRequestInput:
+            additionalProperties: false
+            properties:
+                comment:
+                    maxLength: 2000
+                    type: string
+                expected_birth_date:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                female_dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                male_dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                planned_date:
+                    format: date
+                    type: string
+            required:
+                - female_dog_id
+                - male_dog_id
+                - planned_date
+            type: object
+        BreedingRequestPage:
+            additionalProperties: false
+            properties:
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                records:
+                    items:
+                        $ref: '#/components/schemas/BreedingRequest'
+                    type: array
+            required:
+                - records
+                - next_after
+            type: object
+        BreedingRequestUpdate:
+            additionalProperties: false
+            properties:
+                comment:
+                    maxLength: 2000
+                    type: string
+                expected_birth_date:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                female_dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                male_dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                planned_date:
+                    format: date
+                    type: string
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - female_dog_id
+                - male_dog_id
+                - planned_date
+                - version
+                - reason
+            type: object
         ActivateInput:
             additionalProperties: false
             properties:
@@ -2355,6 +3212,8 @@ components:
                         - dogs_unavailable
                         - veterinary_conflict
                         - veterinary_unavailable
+                        - breeding_conflict
+                        - breeding_unavailable
                     type: string
                 detail:
                     description: Безопасное описание ошибки без внутренних технических деталей
@@ -2506,11 +3365,1305 @@ components:
             name: dogclub_refresh
             type: apiKey
 info:
-    description: 'Этапы 04–07: аккаунты с одним активным профилем, члены клуба, собаки и ветеринарный учёт. Медицинские сведения вносит ветеринар. Владелец читает текущих своих собак при активном членстве; staff/leader читают всех. Два периода препарата, снимки параметров вакцинации, заключения для мероприятий и вязки с проверкой оснований. Версии, причины исправлений и атомарная история. JSON до 16 КиБ, RFC 9457. Племенные процессы, мероприятия, документы и уведомления — последующие этапы.'
+    description: 'Этапы 04–08: аккаунты и профили, члены клуба, собаки, ветеринарный и племенной учёт. Сотрудник оформляет заявки, эксперт решает, сотрудник фиксирует вязку и помёт. Медицинская проверка обеих собак на дату вязки; 365 дней между рождениями помётов с предварительной оценкой даты экспертом. Реальные нарушения сохраняются и отмечаются. Щенки регистрируются с идентификатором. Права профилей не объединяются. Версии, причины исправлений и атомарная история. JSON до 16 КиБ, RFC 9457.'
     title: Клуб собаководства — backend
-    version: 0.7.0
+    version: 0.8.0
 openapi: 3.1.1
 paths:
+    /api/v1/breeding-requests:
+        get:
+            operationId: listBreedingRequest
+            parameters:
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: dog_id
+                  schema:
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingRequestPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Список: staff/expert/leader; owner по своим собакам'
+            tags:
+                - Breeding
+        post:
+            operationId: createBreedingRequest
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/BreedingRequestInput'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingRequest'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Сотрудник оформляет заявку
+            tags:
+                - Breeding
+    /api/v1/breeding-requests/{id}:
+        get:
+            operationId: getBreedingRequest
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingRequest'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Запись; owner не получает медицинский снимок пары
+            tags:
+                - Breeding
+        put:
+            operationId: updateBreedingRequest
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/BreedingRequestUpdate'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingRequest'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Сотрудник исправляет заявку; решение сбрасывается в pending
+            tags:
+                - Breeding
+    /api/v1/breeding-requests/{id}/cancel:
+        post:
+            operationId: cancelBreedingRequest
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/BreedingCorrection'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingRequest'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Отменить заявку до проведения: сотрудник'
+            tags:
+                - Breeding
+    /api/v1/breeding-requests/{id}/check:
+        get:
+            operationId: checkBreedingPair
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingAssessment'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Проверка на планируемую дату; 365 дней между рождениями, ожидаемая дата — оценка
+            tags:
+                - Breeding
+    /api/v1/breeding-requests/{id}/decisions:
+        get:
+            operationId: listBreedingDecisions
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingDecisionPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Сохранённые решения; owner без медицинских снимков
+            tags:
+                - Breeding
+        post:
+            operationId: decideBreedingRequest
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/BreedingDecisionInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingRequest'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Эксперт решает по текущим проверкам и сохраняет снимок
+            tags:
+                - Breeding
+    /api/v1/breeding-requests/{id}/history:
+        get:
+            operationId: historyBreedingRequest
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingChangePage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: История; owner получает метаданные без снимков
+            tags:
+                - Breeding
+    /api/v1/breeding-requests/{id}/perform:
+        post:
+            operationId: performBreeding
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/BreedingMatingInput'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingMating'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Сотрудник фиксирует фактическую вязку; повторная проверка и версия заявки
+            tags:
+                - Breeding
+    /api/v1/breeding/dogs:
+        get:
+            operationId: listBreedingDogs
+            parameters:
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: breed_id
+                  schema:
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: q
+                  schema:
+                    maxLength: 100
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DogPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Поиск без владельцев: staff/expert/leader'
+            tags:
+                - Breeding
+    /api/v1/breedings:
+        get:
+            operationId: listBreedingMating
+            parameters:
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: dog_id
+                  schema:
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingMatingPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Список: staff/expert/leader; owner по своим собакам'
+            tags:
+                - Breeding
+    /api/v1/breedings/{id}:
+        get:
+            operationId: getBreedingMating
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingMating'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Запись; owner не получает медицинский снимок пары
+            tags:
+                - Breeding
+        put:
+            operationId: correctBreedingMating
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/BreedingMatingUpdate'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingMating'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Сотрудник уточняет исход/исправляет запись с причиной
+            tags:
+                - Breeding
+    /api/v1/breedings/{id}/history:
+        get:
+            operationId: historyBreedingMating
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingChangePage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: История; owner получает метаданные без снимков
+            tags:
+                - Breeding
+    /api/v1/litters:
+        get:
+            operationId: listBreedingLitter
+            parameters:
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: dog_id
+                  schema:
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingLitterPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Список: staff/expert/leader; owner по своим собакам'
+            tags:
+                - Breeding
+        post:
+            operationId: createBreedingLitter
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/BreedingLitterInput'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingLitter'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Сохранить реальный помёт, включая нарушение интервала; версия вязки
+            tags:
+                - Breeding
+    /api/v1/litters/{id}:
+        get:
+            operationId: getBreedingLitter
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingLitter'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Запись; owner не получает медицинский снимок пары
+            tags:
+                - Breeding
+        put:
+            operationId: correctBreedingLitter
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/BreedingLitterUpdate'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingLitter'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Исправить помёт с причиной, без противоречий карточкам щенков
+            tags:
+                - Breeding
+    /api/v1/litters/{id}/history:
+        get:
+            operationId: historyBreedingLitter
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingChangePage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: История; owner получает метаданные без снимков
+            tags:
+                - Breeding
+    /api/v1/litters/{id}/puppies:
+        post:
+            operationId: registerBreedingPuppy
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/BreedingPuppyInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingLitter'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Атомарно зарегистрировать щенка, родителей, владельцев и связь с помётом
+            tags:
+                - Breeding
+    /api/v1/litters/{id}/puppies/{dogID}/unlink:
+        post:
+            operationId: unlinkBreedingPuppy
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/BreedingCorrection'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingLitter'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Исправить ошибочную связь с причиной; карточка сохраняется
+            tags:
+                - Breeding
+    /api/v1/litters/{id}/puppies/link:
+        post:
+            operationId: linkBreedingPuppy
+            parameters:
+                - in: path
+                  name: id
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/BreedingLinkInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingLitter'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Связать существующую карточку: версии помёта и собаки'
+            tags:
+                - Breeding
     /api/v1/auth/activate:
         post:
             operationId: activateAccount

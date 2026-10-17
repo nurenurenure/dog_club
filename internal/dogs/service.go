@@ -15,10 +15,11 @@ import (
 )
 
 type Service struct {
-	access  *auth.Service
-	members *members.Service
-	dates   MedicalDatesPolicy
-	now     func() time.Time
+	access   *auth.Service
+	members  *members.Service
+	dates    MedicalDatesPolicy
+	breeding BreedingPolicy
+	now      func() time.Time
 }
 
 // MedicalDatesPolicy is supplied by the veterinary module at composition time.
@@ -243,6 +244,15 @@ func (s *Service) mutate(ctx context.Context, p auth.Principal, id int32, versio
 		result, err = q.card(ctx, id)
 		if err != nil {
 			return err
+		}
+		if s.breeding != nil {
+			ok, e := s.breeding.Consistent(ctx, tx, before, result)
+			if e != nil {
+				return ErrUnavailable
+			}
+			if !ok {
+				return invalid("fields", "Изменение противоречит зарегистрированной вязке или помёту.")
+			}
 		}
 		return q.record(ctx, current, action, reason, &before, result)
 	})
