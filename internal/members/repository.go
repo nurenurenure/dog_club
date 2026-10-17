@@ -13,6 +13,17 @@ import (
 
 type repository struct{ tx pgx.Tx }
 
+func (q *repository) memberExists(ctx context.Context, id int32) error {
+	var exists bool
+	if err := q.tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM club_member WHERE club_member_id=$1)`, id).Scan(&exists); err != nil {
+		return storageError(err)
+	}
+	if !exists {
+		return invalid("owner_ids", "Карточка владельца не найдена.")
+	}
+	return nil
+}
+
 func storageError(err error) error {
 	if err == nil {
 		return nil

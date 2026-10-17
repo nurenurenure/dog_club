@@ -111,6 +111,28 @@ components:
                     $ref: '#/components/headers/NoStore'
                 X-Request-ID:
                     $ref: '#/components/headers/RequestID'
+        DogConflict:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Устаревшая версия, повторный глобальный идентификатор или уже записанный титул; транзакция откатывается целиком.
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        DogsUnavailable:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Сервис учёта собак временно недоступен.
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
         InternalError:
             content:
                 application/problem+json:
@@ -269,6 +291,700 @@ components:
                 - expires_in
                 - user
                 - profile
+            type: object
+        Dog:
+            additionalProperties: false
+            properties:
+                breed:
+                    $ref: '#/components/schemas/DogDictionary'
+                coat_color:
+                    $ref: '#/components/schemas/DogDictionary'
+                date_of_birth:
+                    format: date
+                    type: string
+                height_cm:
+                    maximum: 99999.99
+                    minimum: 0.01
+                    multipleOf: 0.01
+                    type:
+                        - number
+                        - "null"
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                identifier:
+                    $ref: '#/components/schemas/DogIdentifier'
+                nickname:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                owner_ids:
+                    items:
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    maxItems: 100
+                    minItems: 1
+                    type: array
+                    uniqueItems: true
+                pedigree:
+                    $ref: '#/components/schemas/DogPedigree'
+                sex:
+                    $ref: '#/components/schemas/DogDictionary'
+                status:
+                    $ref: '#/components/schemas/DogDictionary'
+                titles:
+                    items:
+                        $ref: '#/components/schemas/DogTitle'
+                    type: array
+                version:
+                    description: Последняя версия всей карточки собаки; обязательна для каждой мутации.
+                    format: int64
+                    minimum: 1
+                    type: integer
+                weight_kg:
+                    maximum: 99999.99
+                    minimum: 0.01
+                    multipleOf: 0.01
+                    type:
+                        - number
+                        - "null"
+            required:
+                - id
+                - nickname
+                - date_of_birth
+                - identifier
+                - status
+                - breed
+                - coat_color
+                - sex
+                - height_cm
+                - weight_kg
+                - version
+                - owner_ids
+                - pedigree
+                - titles
+            type: object
+        DogChange:
+            additionalProperties: false
+            properties:
+                action:
+                    enum:
+                        - dog_created
+                        - dog_updated
+                        - owners_updated
+                        - pedigree_updated
+                        - title_recorded
+                        - title_corrected
+                        - title_record_corrected
+                    type: string
+                actor_profile_id:
+                    type: string
+                actor_role:
+                    type: string
+                actor_user_id:
+                    type: string
+                after:
+                    $ref: '#/components/schemas/Dog'
+                before:
+                    anyOf:
+                        - $ref: '#/components/schemas/Dog'
+                        - type: "null"
+                changed_at:
+                    format: date-time
+                    type: string
+                id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                reason:
+                    maxLength: 500
+                    type: string
+                request_id:
+                    type: string
+            required:
+                - id
+                - actor_user_id
+                - actor_profile_id
+                - actor_role
+                - action
+                - reason
+                - before
+                - after
+                - request_id
+                - changed_at
+            type: object
+        DogCorrectionInput:
+            additionalProperties: false
+            properties:
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    description: Последняя версия всей карточки собаки; обязательна для каждой мутации.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+            type: object
+        DogCreateInput:
+            additionalProperties: false
+            properties:
+                breed_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                coat_color_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                date_of_birth:
+                    format: date
+                    type: string
+                height_cm:
+                    maximum: 99999.99
+                    minimum: 0.01
+                    multipleOf: 0.01
+                    type:
+                        - number
+                        - "null"
+                identifier:
+                    $ref: '#/components/schemas/DogIdentifierInput'
+                nickname:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                owner_ids:
+                    items:
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    maxItems: 100
+                    minItems: 1
+                    type: array
+                    uniqueItems: true
+                sex_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                status_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                weight_kg:
+                    maximum: 99999.99
+                    minimum: 0.01
+                    multipleOf: 0.01
+                    type:
+                        - number
+                        - "null"
+            required:
+                - nickname
+                - date_of_birth
+                - identifier
+                - status_id
+                - breed_id
+                - coat_color_id
+                - sex_id
+                - owner_ids
+            type: object
+        DogDictionaries:
+            additionalProperties: false
+            properties:
+                breeds:
+                    items:
+                        $ref: '#/components/schemas/DogDictionary'
+                    type: array
+                coat_colors:
+                    items:
+                        $ref: '#/components/schemas/DogDictionary'
+                    type: array
+                identifier_types:
+                    items:
+                        $ref: '#/components/schemas/DogDictionary'
+                    type: array
+                sexes:
+                    items:
+                        $ref: '#/components/schemas/DogDictionary'
+                    type: array
+                statuses:
+                    items:
+                        $ref: '#/components/schemas/DogDictionary'
+                    type: array
+                titles:
+                    items:
+                        $ref: '#/components/schemas/DogDictionary'
+                    type: array
+            required:
+                - statuses
+                - breeds
+                - coat_colors
+                - sexes
+                - identifier_types
+                - titles
+            type: object
+        DogDictionary:
+            additionalProperties: false
+            properties:
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                name:
+                    type: string
+            required:
+                - id
+                - name
+            type: object
+        DogExternalParent:
+            additionalProperties: false
+            properties:
+                issuer:
+                    maxLength: 150
+                    type: string
+                nickname:
+                    maxLength: 100
+                    type: string
+                pedigree_number:
+                    maxLength: 100
+                    type: string
+            required:
+                - nickname
+                - pedigree_number
+                - issuer
+            type: object
+        DogExternalParentInput:
+            additionalProperties: false
+            anyOf:
+                - properties:
+                    nickname:
+                        minLength: 1
+                        type: string
+                  required:
+                    - nickname
+                - properties:
+                    pedigree_number:
+                        minLength: 1
+                        type: string
+                  required:
+                    - pedigree_number
+            properties:
+                issuer:
+                    maxLength: 150
+                    type: string
+                nickname:
+                    maxLength: 100
+                    type: string
+                pedigree_number:
+                    maxLength: 100
+                    type: string
+            required: []
+            type: object
+        DogHistoryPage:
+            additionalProperties: false
+            properties:
+                changes:
+                    items:
+                        $ref: '#/components/schemas/DogChange'
+                    maxItems: 100
+                    type: array
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+            required:
+                - changes
+                - next_after
+            type: object
+        DogIdentifier:
+            additionalProperties: false
+            properties:
+                date:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                number:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                type:
+                    $ref: '#/components/schemas/DogDictionary'
+            required:
+                - type
+                - number
+                - date
+            type: object
+        DogIdentifierInput:
+            additionalProperties: false
+            properties:
+                date:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                number:
+                    description: 'Строка: ведущие нули сохраняются. Краевые пробелы удаляются; уникальность глобальная и регистрозависимая.'
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                type_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+            required:
+                - type_id
+                - number
+            type: object
+        DogOwnersInput:
+            additionalProperties: false
+            properties:
+                owner_ids:
+                    items:
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    maxItems: 100
+                    minItems: 1
+                    type: array
+                    uniqueItems: true
+                version:
+                    description: Последняя версия всей карточки собаки; обязательна для каждой мутации.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - owner_ids
+            type: object
+        DogPage:
+            additionalProperties: false
+            properties:
+                dogs:
+                    items:
+                        $ref: '#/components/schemas/DogSummary'
+                    maxItems: 100
+                    type: array
+                next_after:
+                    format: int32
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+            required:
+                - dogs
+                - next_after
+            type: object
+        DogParent:
+            additionalProperties: false
+            properties:
+                dog:
+                    anyOf:
+                        - $ref: '#/components/schemas/DogRelative'
+                        - type: "null"
+                dog_id:
+                    format: int32
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                external:
+                    anyOf:
+                        - $ref: '#/components/schemas/DogExternalParent'
+                        - type: "null"
+            required:
+                - dog_id
+                - dog
+                - external
+            type: object
+        DogParentInput:
+            additionalProperties: false
+            oneOf:
+                - properties:
+                    dog_id:
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    external:
+                        type: "null"
+                  required:
+                    - dog_id
+                - properties:
+                    dog_id:
+                        type: "null"
+                    external:
+                        $ref: '#/components/schemas/DogExternalParentInput'
+                  required:
+                    - external
+            properties:
+                dog_id:
+                    format: int32
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                external:
+                    anyOf:
+                        - $ref: '#/components/schemas/DogExternalParentInput'
+                        - type: "null"
+            required: []
+            type: object
+        DogPatchInput:
+            additionalProperties: false
+            description: Изменяется хотя бы одно поле. Пропуск сохраняет значение; null разрешён только для height_cm/weight_kg. identifier заменяется целиком, date внутри него может быть null. Владельцы и родословная меняются отдельными маршрутами.
+            minProperties: 2
+            properties:
+                breed_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                coat_color_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                date_of_birth:
+                    format: date
+                    type: string
+                height_cm:
+                    maximum: 99999.99
+                    minimum: 0.01
+                    multipleOf: 0.01
+                    type:
+                        - number
+                        - "null"
+                identifier:
+                    $ref: '#/components/schemas/DogIdentifierInput'
+                nickname:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                sex_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                status_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                version:
+                    description: Последняя версия всей карточки собаки; обязательна для каждой мутации.
+                    format: int64
+                    minimum: 1
+                    type: integer
+                weight_kg:
+                    maximum: 99999.99
+                    minimum: 0.01
+                    multipleOf: 0.01
+                    type:
+                        - number
+                        - "null"
+            required:
+                - version
+            type: object
+        DogPedigree:
+            additionalProperties: false
+            properties:
+                father:
+                    anyOf:
+                        - $ref: '#/components/schemas/DogParent'
+                        - type: "null"
+                issuer:
+                    maxLength: 150
+                    type: string
+                mother:
+                    anyOf:
+                        - $ref: '#/components/schemas/DogParent'
+                        - type: "null"
+                number:
+                    maxLength: 100
+                    type: string
+            required:
+                - number
+                - issuer
+                - mother
+                - father
+            type: object
+        DogPedigreeInput:
+            additionalProperties: false
+            properties:
+                father:
+                    anyOf:
+                        - $ref: '#/components/schemas/DogParentInput'
+                        - type: "null"
+                issuer:
+                    maxLength: 150
+                    type: string
+                mother:
+                    anyOf:
+                        - $ref: '#/components/schemas/DogParentInput'
+                        - type: "null"
+                number:
+                    maxLength: 100
+                    type: string
+                version:
+                    description: Последняя версия всей карточки собаки; обязательна для каждой мутации.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+            type: object
+        DogRelative:
+            additionalProperties: false
+            properties:
+                breed:
+                    $ref: '#/components/schemas/DogDictionary'
+                date_of_birth:
+                    format: date
+                    type: string
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                nickname:
+                    type: string
+                pedigree_issuer:
+                    type: string
+                pedigree_number:
+                    type: string
+                sex:
+                    $ref: '#/components/schemas/DogDictionary'
+            required:
+                - id
+                - nickname
+                - date_of_birth
+                - sex
+                - breed
+                - pedigree_number
+                - pedigree_issuer
+            type: object
+        DogSummary:
+            additionalProperties: false
+            properties:
+                breed:
+                    $ref: '#/components/schemas/DogDictionary'
+                coat_color:
+                    $ref: '#/components/schemas/DogDictionary'
+                date_of_birth:
+                    format: date
+                    type: string
+                height_cm:
+                    maximum: 99999.99
+                    minimum: 0.01
+                    multipleOf: 0.01
+                    type:
+                        - number
+                        - "null"
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                identifier:
+                    $ref: '#/components/schemas/DogIdentifier'
+                nickname:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                sex:
+                    $ref: '#/components/schemas/DogDictionary'
+                status:
+                    $ref: '#/components/schemas/DogDictionary'
+                version:
+                    description: Последняя версия всей карточки собаки; обязательна для каждой мутации.
+                    format: int64
+                    minimum: 1
+                    type: integer
+                weight_kg:
+                    maximum: 99999.99
+                    minimum: 0.01
+                    multipleOf: 0.01
+                    type:
+                        - number
+                        - "null"
+            required:
+                - id
+                - nickname
+                - date_of_birth
+                - identifier
+                - status
+                - breed
+                - coat_color
+                - sex
+                - height_cm
+                - weight_kg
+                - version
+            type: object
+        DogTitle:
+            additionalProperties: false
+            properties:
+                awarded_on:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                basis:
+                    maxLength: 1000
+                    type: string
+                type:
+                    $ref: '#/components/schemas/DogDictionary'
+            required:
+                - type
+                - awarded_on
+                - basis
+            type: object
+        DogTitleInput:
+            additionalProperties: false
+            properties:
+                awarded_on:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                basis:
+                    maxLength: 1000
+                    type: string
+                title_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                version:
+                    description: Последняя версия всей карточки собаки; обязательна для каждой мутации.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - title_id
+            type: object
+        DogTitleUpdateInput:
+            additionalProperties: false
+            properties:
+                awarded_on:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                basis:
+                    maxLength: 1000
+                    type: string
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    description: Последняя версия всей карточки собаки; обязательна для каждой мутации.
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
             type: object
         EnabledInput:
             additionalProperties: false
@@ -795,6 +1511,8 @@ components:
                         - rate_limited
                         - member_conflict
                         - members_unavailable
+                        - dog_conflict
+                        - dogs_unavailable
                     type: string
                 detail:
                     description: Безопасное описание ошибки без внутренних технических деталей
@@ -946,9 +1664,9 @@ components:
             name: dogclub_refresh
             type: apiKey
 info:
-    description: 'Этапы 04–05: приглашения, аккаунты с переключаемыми профилями и карточки членов клуба. Один активный профиль на сессию, права не объединяются. Access JWT 10 минут; refresh в HttpOnly cookie, абсолютный срок сессии 7 дней, ротация и проверка PostgreSQL. Members: staff редактирует все карточки, leader читает все, owner читает только свою при активном членстве. При неактивном членстве весь раздел владельца закрыт, включая историю и справочники; account controls и другие профили сохраняются. Admin управляет аккаунтами и привязкой к карточке; для ведения карточек нужен staff. club_member.role_id удалён. Все изменения карточек версионируются и сохраняют историю атомарно. JSON auth/members ограничен 16 КиБ. Ошибки RFC 9457; health сохраняет свой JSON DTO. Same-origin browser policy; React позже. Почта только локальная Mailpit.'
+    description: 'Этапы 04–06: аккаунты с переключаемыми профилями, члены клуба и собаки. Один активный профиль на сессию, права не объединяются. Access JWT 10 минут, refresh cookie 7 дней, проверка PostgreSQL. Staff регистрирует собак только с уникальным идентификатором; leader читает всех, активный owner — только своих. Неактивное членство закрывает разделы владельца; другие профили и account controls сохраняются. Родители: карточка, внешние сведения у потомка или неизвестный. Проверяются ссылки, пол/возраст и циклы. Изменения версионируются и атомарно сохраняют историю. Титулы не истекают автоматически; исправления требуют причины. JSON до 16 КиБ, RFC 9457, same-origin policy, локальный Mailpit. Ветеринария, племенная работа и файлы документов — последующие этапы.'
     title: Клуб собаководства — backend
-    version: 0.5.0
+    version: 0.6.0
 openapi: 3.1.1
 paths:
     /api/v1/auth/activate:
@@ -1325,6 +2043,642 @@ paths:
             security:
                 - bearerAuth: []
             summary: Смена профиля этой сессии и отказ старым access JWT; refresh cookie сохраняется
+    /api/v1/dog-dictionaries:
+        get:
+            operationId: getDogDictionaries
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DogDictionaries'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Справочники собак: staff, leader или активный owner'
+            tags:
+                - Dogs
+    /api/v1/dogs:
+        get:
+            operationId: listDogs
+            parameters:
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: breed_id
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: status_id
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: owner_id
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - description: Подстрока клички, идентификатора или номера родословной; % и _ буквальные.
+                  in: query
+                  name: q
+                  schema:
+                    maxLength: 100
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DogPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Каталог собак: staff/leader — все; активный owner — только свои'
+            tags:
+                - Dogs
+        post:
+            operationId: createDog
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/DogCreateInput'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Dog'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Регистрация с обязательным идентификатором: staff'
+            tags:
+                - Dogs
+    /api/v1/dogs/{dogID}:
+        get:
+            operationId: getDog
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Dog'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Карточка своей собаки для owner, любая для staff/leader
+            tags:
+                - Dogs
+        patch:
+            operationId: patchDog
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/DogPatchInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Dog'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Изменение полей и проверка родословных потомков: staff'
+            tags:
+                - Dogs
+    /api/v1/dogs/{dogID}/history:
+        get:
+            operationId: getDogHistory
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DogHistoryPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: История с доступом по текущим владельцам
+            tags:
+                - Dogs
+    /api/v1/dogs/{dogID}/owners:
+        put:
+            description: Минимум один существующий член клуба; аккаунт и активное членство для записи владения не обязательны. Доступ определяется текущим составом владельцев при каждом запросе.
+            operationId: replaceDogOwners
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/DogOwnersInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Dog'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Полная замена текущих владельцев: staff'
+            tags:
+                - Dogs
+    /api/v1/dogs/{dogID}/pedigree:
+        put:
+            description: 'Одна родословная на собаку. Для каждого родителя: карточка, внешние сведения или null. Пропущенные поля очищаются. Автосопоставления внешних родителей нет; проверяются пол/возраст известных родителей и циклы.'
+            operationId: replaceDogPedigree
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/DogPedigreeInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Dog'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Полная замена сведений о происхождении: staff'
+            tags:
+                - Dogs
+    /api/v1/dogs/{dogID}/titles:
+        post:
+            operationId: recordDogTitle
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/DogTitleInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Dog'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Записать уже присвоенный титул: staff'
+            tags:
+                - Dogs
+    /api/v1/dogs/{dogID}/titles/{titleID}:
+        delete:
+            description: Исправление учётной ошибки сохраняет запись в истории. Автоматического истечения или снятия действительных титулов нет.
+            operationId: correctDogTitleRecord
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: titleID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/DogCorrectionInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Dog'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Удалить ошибочную запись титула с обязательной причиной: staff'
+            tags:
+                - Dogs
+        put:
+            operationId: correctDogTitleMetadata
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: titleID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/DogTitleUpdateInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Dog'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Исправить дату/основание записи титула с причиной: staff'
+            tags:
+                - Dogs
     /api/v1/invitations:
         post:
             description: Требуется действующий активный профиль admin; другие назначенные профили не дают этих прав.

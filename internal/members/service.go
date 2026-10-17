@@ -93,6 +93,34 @@ func ownerAccess(ctx context.Context, q *repository, p auth.Principal) error {
 	}
 	return nil
 }
+
+// RequireActiveOwner provides the membership policy to other domain modules.
+// Call it inside auth.WithAccess using the supplied transaction and principal;
+// it must not open a nested transaction or expose the member's personal data.
+func (s *Service) RequireActiveOwner(ctx context.Context, tx pgx.Tx, p auth.Principal) (int32, error) {
+	if err := auth.RequireProfile(p, "owner"); err != nil {
+		return 0, err
+	}
+	if err := ownerAccess(ctx, &repository{tx}, p); err != nil {
+		return 0, err
+	}
+	return *p.User.ClubMemberID, nil
+}
+
+// ValidateReferences checks member IDs for a trusted domain transaction without
+// returning names, contacts or account data. Membership need not be active to
+// remain recorded as an owner; active membership gates owner access instead.
+func (s *Service) ValidateReferences(ctx context.Context, tx pgx.Tx, ids []int32) error {
+	for _, id := range ids {
+		if id < 1 {
+			return invalid("owner_ids", "Укажите существующие карточки владельцев.")
+		}
+		if err := (&repository{tx}).memberExists(ctx, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func memberForRead(ctx context.Context, q *repository, p auth.Principal, id int32) (Member, error) {
 	if err := ownerAccess(ctx, q, p); err != nil {
 		return Member{}, err

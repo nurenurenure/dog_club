@@ -32,7 +32,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if err := Run(ctx, "status", url, &output); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(output.String(), "pending") != 4 || scalar(t, ctx, conn,
+	if strings.Count(output.String(), "pending") != 5 || scalar(t, ctx, conn,
 		`SELECT count(*) FROM pg_tables WHERE schemaname='public'`) != 0 {
 		t.Fatal("status on an empty database must list pending migrations without creating tables")
 	}
@@ -46,19 +46,19 @@ func TestPostgresMigrations(t *testing.T) {
 			t.Fatalf("unexpected migration result: %q", output.String())
 		}
 	}
-	apply("applied 4 migration(s)\n")
-	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 42 {
-		t.Fatalf("expected 41 application tables and Goose history, got %d", count)
+	apply("applied 5 migration(s)\n")
+	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 43 {
+		t.Fatalf("expected 42 application tables and Goose history, got %d", count)
 	}
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_constraint c JOIN pg_namespace n
-		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 51 {
-		t.Fatalf("expected 36 domain, 12 auth and 3 member-history FK, got %d", count)
+		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 56 {
+		t.Fatalf("expected 36 domain, 12 auth, 3 member-history and 5 dogs FK, got %d", count)
 	}
 	checkSeeds(t, ctx, conn)
 	apply("applied 0 migration(s)\n")
 	output.Reset()
-	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 4 {
-		t.Fatalf("expected four applied versions: %v %q", err, output.String())
+	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 5 {
+		t.Fatalf("expected five applied versions: %v %q", err, output.String())
 	}
 
 	t.Run("constraints and deletion policies", func(t *testing.T) {
@@ -73,8 +73,8 @@ func TestPostgresMigrations(t *testing.T) {
 			dog_status_id, identifier_type_id, dog_breed_id, coat_color_id, sex_id) VALUES
 			(1001, 'Тест 1', '2020-01-01', 'CHECK-ONE', 1, 1, 1, 1, 1),
 			(1002, 'Тест 2', '2020-01-01', 'CHECK-TWO', 1, 1, 1, 1, 1),
-			(1003, 'Тест 3', '2020-01-01', NULL, 1, 1, 1, 1, 1),
-			(1004, 'Тест 4', '2020-01-01', NULL, 1, 1, 1, 1, 1);
+			(1003, 'Тест 3', '2020-01-01', 'CHECK-THREE', 1, 1, 1, 1, 1),
+			(1004, 'Тест 4', '2020-01-01', 'CHECK-FOUR', 1, 1, 1, 1, 1);
 		INSERT INTO veterinary_examination (veterinary_examination_id, dog_id,
 			veterinary_examination_date, club_member_id) VALUES (1001, 1001, now(), 1001);
 		INSERT INTO dog_club_member VALUES (1001,1001);
@@ -86,6 +86,10 @@ func TestPostgresMigrations(t *testing.T) {
 		for _, test := range []struct{ name, query, code string }{
 			{"duplicate owner", `INSERT INTO dog_club_member VALUES (1001,1001)`, "23505"},
 			{"duplicate title", `INSERT INTO title_dog VALUES (1,1001)`, "23505"},
+			{"missing identifier", `INSERT INTO dog(dog_nickname,dog_date_of_birth,dog_status_id,identifier_type_id,dog_breed_id,coat_color_id,sex_id) VALUES('Missing identifier','2020-01-01',1,1,1,1,1)`, "23502"},
+			{"blank identifier", `INSERT INTO dog(dog_nickname,dog_date_of_birth,dog_identifier_number,dog_status_id,identifier_type_id,dog_breed_id,coat_color_id,sex_id) VALUES('Blank identifier','2020-01-01',' ',1,1,1,1,1)`, "23514"},
+			{"missing parent", `INSERT INTO pedigree(dog_id,pedigree_mother) VALUES(1001,999999)`, "23503"},
+			{"self parent", `INSERT INTO pedigree(dog_id,pedigree_mother) VALUES(1001,1001)`, "23514"},
 			{"duplicate diagnosis", `INSERT INTO veterinary_examination_disease VALUES (1001,1001,1)`, "23505"},
 			{"missing dog", `INSERT INTO dog_club_member VALUES (999999,1001)`, "23503"},
 			{"missing member", `INSERT INTO dog_club_member VALUES (1001,999999)`, "23503"},
@@ -98,9 +102,9 @@ func TestPostgresMigrations(t *testing.T) {
 			{"duplicate identifier", `INSERT INTO dog (dog_nickname,dog_date_of_birth,dog_identifier_number,
 				dog_status_id,identifier_type_id,dog_breed_id,coat_color_id,sex_id)
 				VALUES ('Дубликат','2020-01-01','CHECK-ONE',1,1,1,1,1)`, "23505"},
-			{"missing dog dictionary", `INSERT INTO dog (dog_nickname,dog_date_of_birth,
+			{"missing dog dictionary", `INSERT INTO dog (dog_nickname,dog_date_of_birth,dog_identifier_number,
 				dog_status_id,identifier_type_id,dog_breed_id,coat_color_id,sex_id)
-				VALUES ('Сирота','2020-01-01',1,1,999999,1,1)`, "23503"},
+				VALUES ('Сирота','2020-01-01','ORPHAN-CHECK',1,1,999999,1,1)`, "23503"},
 		} {
 			t.Run(test.name, func(t *testing.T) {
 				savepoint, err := tx.Begin(ctx)
@@ -146,7 +150,10 @@ func TestPostgresMigrations(t *testing.T) {
 	})
 
 	t.Run("referenced seeds prevent partial rollback", func(t *testing.T) {
-		// Roll back members and auth before attempting the seed down.
+		// Roll back dogs, members and auth before attempting the seed down.
+		if err := Run(ctx, "down", url, io.Discard); err != nil {
+			t.Fatal(err)
+		}
 		if err := Run(ctx, "down", url, io.Discard); err != nil {
 			t.Fatal(err)
 		}
@@ -170,7 +177,7 @@ func TestPostgresMigrations(t *testing.T) {
 		checkSeeds(t, ctx, conn)
 	})
 
-	for range 4 {
+	for range 5 {
 		if err := Run(ctx, "down", url, io.Discard); err != nil {
 			t.Fatal(err)
 		}
@@ -178,7 +185,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 1 {
 		t.Fatalf("full rollback must leave only Goose history, got %d tables", count)
 	}
-	apply("applied 4 migration(s)\n")
+	apply("applied 5 migration(s)\n")
 	checkSeeds(t, ctx, conn)
 }
 
@@ -205,6 +212,9 @@ func TestMembersUpgradePreservesCardsAndRefusesDestructiveRollback(t *testing.T)
 	if err := Run(ctx, "down", url, io.Discard); err != nil {
 		t.Fatal(err)
 	}
+	if err := Run(ctx, "down", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := conn.Exec(ctx, `INSERT INTO club_member(club_member_full_name,role_id,membership_status_id) VALUES('Legacy card',1,1)`); err != nil {
 		t.Fatal(err)
 	}
@@ -220,11 +230,76 @@ func TestMembersUpgradePreservesCardsAndRefusesDestructiveRollback(t *testing.T)
 	if scalar(t, ctx, conn, `SELECT count(*) FROM users`) != 0 || scalar(t, ctx, conn, `SELECT count(*) FROM user_profiles`) != 0 {
 		t.Fatal("legacy role was turned into access privileges")
 	}
+	if err := Run(ctx, "down", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
 	if err := Run(ctx, "down", url, io.Discard); err == nil {
 		t.Fatal("rollback invented a role for an existing card")
 	}
 	if scalar(t, ctx, conn, `SELECT count(*) FROM club_member`) != 1 || scalar(t, ctx, conn, `SELECT count(*) FROM member_changes`) != 0 {
 		t.Fatal("failed rollback changed the member schema or data")
+	}
+}
+
+func TestDogsUpgradeRefusesMissingIdentifiersAndKeepsData(t *testing.T) {
+	ctx, url, conn := testDatabase(t)
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "down", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `INSERT INTO dog(dog_nickname,dog_date_of_birth,dog_status_id,identifier_type_id,dog_breed_id,coat_color_id,sex_id) VALUES('Legacy dog','2020-01-01',1,1,1,1,1)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "up", url, io.Discard); err == nil || !strings.Contains(err.Error(), "23502") {
+		t.Fatal("upgrade fabricated an identifier for a legacy dog")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM dog WHERE dog_nickname='Legacy dog' AND dog_identifier_number IS NULL`) != 1 || scalar(t, ctx, conn, `SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='dog_changes'`) != 0 {
+		t.Fatal("failed dogs upgrade changed data or partially applied schema")
+	}
+	if _, err := conn.Exec(ctx, `UPDATE dog SET dog_identifier_number='LEGACY-0001' WHERE dog_nickname='Legacy dog'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM dog WHERE dog_nickname='Legacy dog' AND dog_identifier_number='LEGACY-0001' AND version=1`) != 1 {
+		t.Fatal("upgrade lost a corrected legacy card")
+	}
+	if err := Run(ctx, "down", url, io.Discard); err == nil {
+		t.Fatal("rollback silently dropped added dog data")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM dog`) != 1 || scalar(t, ctx, conn, `SELECT count(*) FROM dog_changes`) != 0 {
+		t.Fatal("refused dogs rollback changed schema or data")
+	}
+}
+
+func TestDogsUpgradeRejectsOrphanParentsAndDuplicatePedigrees(t *testing.T) {
+	ctx, url, conn := testDatabase(t)
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "down", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `INSERT INTO dog(dog_id,dog_nickname,dog_date_of_birth,dog_identifier_number,dog_status_id,identifier_type_id,dog_breed_id,coat_color_id,sex_id) VALUES(101,'Legacy dog','2020-01-01','OLD-101',1,1,1,1,1); INSERT INTO pedigree(dog_id,pedigree_mother,pedigree_father) VALUES(101,9999,9998)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "up", url, io.Discard); err == nil || !strings.Contains(err.Error(), "23503") {
+		t.Fatal("upgrade accepted missing parents")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM pedigree`) != 1 {
+		t.Fatal("upgrade removed invalid pedigree instead of refusing")
+	}
+	if _, err := conn.Exec(ctx, `DELETE FROM pedigree; INSERT INTO pedigree(dog_id,pedigree_mother,pedigree_father) VALUES(101,101,101),(101,101,101)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "up", url, io.Discard); err == nil || !strings.Contains(err.Error(), "23505") {
+		t.Fatal("upgrade accepted multiple pedigrees for one dog")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM pedigree`) != 2 {
+		t.Fatal("upgrade silently discarded duplicate pedigree data")
 	}
 }
 

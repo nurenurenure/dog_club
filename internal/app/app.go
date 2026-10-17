@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"dogclub.local/backend/internal/auth"
+	"dogclub.local/backend/internal/dogs"
 	"dogclub.local/backend/internal/health"
 	"dogclub.local/backend/internal/members"
 	"dogclub.local/backend/internal/platform/config"
@@ -44,7 +45,8 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		return nil, err
 	}
 	authHandler := auth.NewHandler(service, cfg.CookieSecure)
-	return newApp(cfg, logger, pool.Ping, pool.Close, authHandler, members.NewHandler(members.NewService(service), authHandler)), nil
+	memberService := members.NewService(service)
+	return newApp(cfg, logger, pool.Ping, pool.Close, authHandler, members.NewHandler(memberService, authHandler), dogs.NewHandler(dogs.NewService(service, memberService), authHandler)), nil
 }
 
 func newApp(cfg config.Config, logger *slog.Logger, ping func(context.Context) error, closePool func(), apiHandlers ...interface{ RegisterRoutes(chi.Router) }) *App {
