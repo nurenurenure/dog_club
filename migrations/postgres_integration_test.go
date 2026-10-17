@@ -32,7 +32,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if err := Run(ctx, "status", url, &output); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(output.String(), "pending") != 8 || scalar(t, ctx, conn,
+	if strings.Count(output.String(), "pending") != 9 || scalar(t, ctx, conn,
 		`SELECT count(*) FROM pg_tables WHERE schemaname='public'`) != 0 {
 		t.Fatal("status on an empty database must list pending migrations without creating tables")
 	}
@@ -46,19 +46,19 @@ func TestPostgresMigrations(t *testing.T) {
 			t.Fatalf("unexpected migration result: %q", output.String())
 		}
 	}
-	apply("applied 8 migration(s)\n")
-	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 57 {
-		t.Fatalf("expected 56 application tables and Goose history, got %d", count)
+	apply("applied 9 migration(s)\n")
+	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 59 {
+		t.Fatalf("expected 58 application tables and Goose history, got %d", count)
 	}
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_constraint c JOIN pg_namespace n
-		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 99 {
-		t.Fatalf("expected 80 previous and 19 event FK, got %d", count)
+		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 106 {
+		t.Fatalf("expected 99 previous and 7 document FK, got %d", count)
 	}
 	checkSeeds(t, ctx, conn)
 	apply("applied 0 migration(s)\n")
 	output.Reset()
-	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 8 {
-		t.Fatalf("expected eight applied versions: %v %q", err, output.String())
+	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 9 {
+		t.Fatalf("expected nine applied versions: %v %q", err, output.String())
 	}
 
 	t.Run("constraints and deletion policies", func(t *testing.T) {
@@ -168,7 +168,7 @@ func TestPostgresMigrations(t *testing.T) {
 		checkSeeds(t, ctx, conn)
 	})
 
-	for range 8 {
+	for range 9 {
 		if err := Run(ctx, "down", url, io.Discard); err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 1 {
 		t.Fatalf("full rollback must leave only Goose history, got %d tables", count)
 	}
-	apply("applied 8 migration(s)\n")
+	apply("applied 9 migration(s)\n")
 	checkSeeds(t, ctx, conn)
 }
 
@@ -411,6 +411,7 @@ func TestEventsUpgradePreservesDatesAddressesAndResults(t *testing.T) {
 	if scalar(t, ctx, conn, `SELECT count(*) FROM event_registration`) != 0 || scalar(t, ctx, conn, `SELECT count(*) FROM event_changes`) != 0 {
 		t.Fatal("upgrade invented participation/history")
 	}
+	rollbackTo(t, ctx, url, 8)
 	if err := Run(ctx, "down", url, io.Discard); err != nil {
 		t.Fatal(err)
 	}
@@ -423,6 +424,7 @@ func TestEventsUpgradePreservesDatesAddressesAndResults(t *testing.T) {
 	if _, err := conn.Exec(ctx, `INSERT INTO event_venue(name,locality) VALUES('New venue','New locality')`); err != nil {
 		t.Fatal(err)
 	}
+	rollbackTo(t, ctx, url, 8)
 	if err := Run(ctx, "down", url, io.Discard); err == nil {
 		t.Fatal("rollback discarded a new venue")
 	}
@@ -434,6 +436,9 @@ func TestEventsUpgradePreservesDatesAddressesAndResults(t *testing.T) {
 func checkSeeds(t *testing.T, ctx context.Context, conn *pgx.Conn) {
 	t.Helper()
 	for table, count := range seedCounts {
+		if table == "document_type" && scalar(t, ctx, conn, `SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='document_file'`) > 0 {
+			count += 2
+		}
 		if got := scalar(t, ctx, conn, "SELECT count(*) FROM "+pgx.Identifier{table}.Sanitize()); got != count {
 			t.Errorf("%s: expected %d seed rows, got %d", table, count, got)
 		}
@@ -516,5 +521,44 @@ func rollbackTo(t *testing.T, ctx context.Context, url string, target int) {
 		if err := Run(ctx, "down", url, io.Discard); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestDocumentsUpgradePreservesAmbiguousLegacyLinks(t *testing.T) {
+	ctx, url, conn := testDatabase(t)
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	rollbackTo(t, ctx, url, 8)
+	_, err := conn.Exec(ctx, `INSERT INTO club_member(club_member_id,club_member_full_name,membership_status_id) VALUES(701,'Legacy document person',1);
+ INSERT INTO dog(dog_id,dog_nickname,dog_date_of_birth,dog_identifier_number,dog_status_id,identifier_type_id,dog_breed_id,coat_color_id,sex_id) VALUES(701,'Legacy documented dog','2020-01-01','DOC-LEGACY-701',1,1,1,1,1);
+ INSERT INTO document(document_id,document_number,document_given_by,document_issue_date,document_expiration_date,dog_id,club_member_id,document_type_id) VALUES(701,'LEGACY-DOC','Legacy issuer','2024-02-02','2024-01-01',701,701,1)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM document WHERE document_id=701 AND document_number='LEGACY-DOC' AND document_given_by='Legacy issuer' AND dog_id=701 AND club_member_id=701 AND document_issue_date='2024-02-02' AND document_expiration_date='2024-01-01' AND subject_member_id IS NULL AND recipient_member_id IS NULL AND category IS NULL AND status='legacy' AND version=1`) != 1 {
+		t.Fatal("legacy facts changed or identity guessed")
+	}
+	if err = Run(ctx, "down", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM document WHERE document_id=701 AND club_member_id=701 AND dog_id=701`) != 1 {
+		t.Fatal("rollback lost legacy document")
+	}
+	if err = Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	_, err = conn.Exec(ctx, `INSERT INTO document(document_number,document_type_id,subject_member_id,category,status) VALUES('NEW',1,701,'general','active')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = Run(ctx, "down", url, io.Discard); err == nil {
+		t.Fatal("rollback discarded new document")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM document`) != 2 {
+		t.Fatal("failed rollback lost rows")
 	}
 }

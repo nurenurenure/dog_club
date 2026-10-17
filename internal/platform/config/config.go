@@ -27,6 +27,7 @@ type Config struct {
 	AuthIOTimeout     time.Duration
 	CookieSecure      bool
 	SMTPAddr          string
+	DocumentsDir      string
 	MailFrom          string
 }
 
@@ -68,6 +69,10 @@ func load(lookup func(string) (string, bool)) (Config, error) {
 	smtpNumber, smtpNumberErr := strconv.Atoi(smtpPort)
 	if smtpErr != nil || smtpNumberErr != nil || smtpNumber < 1 || smtpNumber > 65535 || !net.ParseIP(smtpHost).IsLoopback() {
 		return Config{}, fmt.Errorf("SMTP_ADDR must use a loopback IP and a valid port")
+	}
+	cfg.DocumentsDir = value("DOCUMENTS_DIR", "var/documents")
+	if strings.TrimSpace(cfg.DocumentsDir) == "" {
+		return Config{}, fmt.Errorf("DOCUMENTS_DIR must not be empty")
 	}
 	cfg.MailFrom = value("MAIL_FROM", "noreply@dogclub.test")
 	_, port, err := net.SplitHostPort(cfg.HTTPAddr)

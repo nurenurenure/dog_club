@@ -18,7 +18,7 @@ func TestLoadDefaults(t *testing.T) {
 		cfg.ReadHeaderTimeout != 5*time.Second || cfg.ReadTimeout != 15*time.Second ||
 		cfg.WriteTimeout != 15*time.Second || cfg.IdleTimeout != time.Minute ||
 		!cfg.CookieSecure || len(cfg.JWTKey) != 32 || cfg.AuthIOTimeout != 10*time.Second ||
-		cfg.SMTPAddr != "127.0.0.1:1025" {
+		cfg.DocumentsDir != "var/documents" || cfg.SMTPAddr != "127.0.0.1:1025" {
 		t.Fatalf("unexpected defaults: HTTP=%s, level=%s, ping=%s, shutdown=%s",
 			cfg.HTTPAddr, cfg.LogLevel, cfg.DBPingTimeout, cfg.ShutdownTimeout)
 	}
@@ -81,6 +81,7 @@ func TestLoadRejectsInvalidConfigWithoutLeakingValues(t *testing.T) {
 		{"invalid JWT key", "AUTH_JWT_KEY", "secret_value"},
 		{"short JWT key", "AUTH_JWT_KEY", base64.StdEncoding.EncodeToString([]byte("short"))},
 		{"empty issuer", "AUTH_JWT_ISSUER", ""},
+		{"empty document directory", "DOCUMENTS_DIR", ""},
 		{"empty audience", "AUTH_JWT_AUDIENCE", ""},
 		{"invalid cookie flag", "AUTH_COOKIE_SECURE", "secret_value"},
 		{"external SMTP", "SMTP_ADDR", "203.0.113.1:25"},

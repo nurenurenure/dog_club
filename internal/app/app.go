@@ -10,12 +10,14 @@ import (
 
 	"dogclub.local/backend/internal/auth"
 	"dogclub.local/backend/internal/breeding"
+	"dogclub.local/backend/internal/documents"
 	"dogclub.local/backend/internal/dogs"
 	"dogclub.local/backend/internal/events"
 	"dogclub.local/backend/internal/health"
 	"dogclub.local/backend/internal/members"
 	"dogclub.local/backend/internal/platform/config"
 	"dogclub.local/backend/internal/platform/database"
+	"dogclub.local/backend/internal/platform/filestore"
 	"dogclub.local/backend/internal/platform/httpapi"
 	"dogclub.local/backend/internal/platform/mail"
 	"dogclub.local/backend/internal/platform/middleware"
@@ -55,8 +57,14 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	breedingService := breeding.NewService(service, dogService, vetService)
 	dogService.SetEventPolicy(events.DogPolicy{})
 	eventService := events.NewService(service, memberService, dogService, vetService)
-	return newApp(cfg, logger, pool.Ping, pool.Close, authHandler,
-		members.NewHandler(memberService, authHandler), dogs.NewHandler(dogService, authHandler), veterinary.NewHandler(vetService, authHandler), breeding.NewHandler(breedingService, authHandler), events.NewHandler(eventService, authHandler)), nil
+	files, err := filestore.New(cfg.DocumentsDir)
+	if err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("private document storage unavailable")
+	}
+	documentService := documents.NewService(service, memberService, dogService, vetService, files)
+	return newApp(cfg, logger, pool.Ping, func() { _ = files.Close(); pool.Close() }, authHandler,
+		members.NewHandler(memberService, authHandler), dogs.NewHandler(dogService, authHandler), veterinary.NewHandler(vetService, authHandler), breeding.NewHandler(breedingService, authHandler), events.NewHandler(eventService, authHandler), documents.NewHandler(documentService, authHandler)), nil
 }
 
 func newApp(cfg config.Config, logger *slog.Logger, ping func(context.Context) error, closePool func(), apiHandlers ...interface{ RegisterRoutes(chi.Router) }) *App {
