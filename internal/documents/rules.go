@@ -16,6 +16,8 @@ import (
 
 func category(name string) string {
 	switch name {
+	case "Заключение о вязке", "Акт о регистрации помёта":
+		return "breeding"
 	case "Ветеринарный паспорт", "Ветеринарная справка", "Документ о результатах обследования":
 		return "medical"
 	default:
@@ -27,6 +29,9 @@ func text(s string, max int) bool {
 }
 func date(s string) bool { t, e := time.Parse(time.DateOnly, s); return e == nil && t.Year() > 0 }
 func validate(in *Input) error {
+	if in.BreedingDecisionID != nil && (*in.BreedingDecisionID < 1 || in.LitterID != nil) || in.LitterID != nil && *in.LitterID < 1 {
+		return invalid("basis", "Укажите одно положительное племенное основание.")
+	}
 	in.Number = strings.TrimSpace(in.Number)
 	in.Issuer = strings.TrimSpace(in.Issuer)
 	if in.TypeID < 1 || !text(in.Number, 50) || !text(in.Issuer, 2000) {

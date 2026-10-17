@@ -73,9 +73,10 @@ type Title struct {
 }
 type Dog struct {
 	Summary
-	OwnerIDs []int32  `json:"owner_ids"`
-	Pedigree Pedigree `json:"pedigree"`
-	Titles   []Title  `json:"titles"`
+	RegistrationDate *string  `json:"registration_date,omitempty"`
+	OwnerIDs         []int32  `json:"owner_ids"`
+	Pedigree         Pedigree `json:"pedigree"`
+	Titles           []Title  `json:"titles"`
 }
 type Change struct {
 	ID             int64           `json:"id"`

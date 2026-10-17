@@ -2,11 +2,14 @@ package documents
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"dogclub.local/backend/internal/breeding"
 	"dogclub.local/backend/internal/dogs"
 	"dogclub.local/backend/internal/members"
 	"dogclub.local/backend/internal/veterinary"
@@ -69,5 +72,37 @@ func TestFileTypesNamesAndDates(t *testing.T) {
 	in.ExpiresOn = ptr("2026-10-16")
 	if validate(&in) == nil {
 		t.Fatal("reversed validity accepted")
+	}
+}
+
+func TestBreedingFormsLongLitterAndV1SourceCompatibility(t *testing.T) {
+	unknown := sourceSnapshot{Document: Input{TypeID: 1}, Dog: &dogs.Dog{}}
+	data, err := json.Marshal(unknown)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"breeding_decision_id", "litter_id", "registration_date", "breeding", "expert_name"} {
+		if bytes.Contains(data, []byte(`"`+field+`"`)) {
+			t.Fatal("new empty fields would mark old PDF sources stale")
+		}
+	}
+	b := &breeding.DocumentSource{Personal: true, Female: dogs.Summary{Nickname: "Мать", Identifier: dogs.Identifier{Number: "DAM-001"}}, Male: dogs.Summary{Nickname: "Отец", Identifier: dogs.Identifier{Number: "SIRE-001"}}, Litter: &breeding.Litter{ID: 1, BreedingID: 1, DateOfBirth: "2025-01-01", TotalPuppies: 80, IntervalDays: ptr(int32(300)), IntervalViolation: true}}
+	for i := range 80 {
+		b.Puppies = append(b.Puppies, dogs.Summary{Nickname: fmt.Sprintf("Щенок %d с длинной кличкой для проверки печати", i+1), Identifier: dogs.Identifier{Type: dogs.Dictionary{Name: "Микрочип"}, Number: fmt.Sprintf("LONG-PUPPY-%d", i+1)}})
+	}
+	data, err = render(sourceSnapshot{Document: Input{Number: "АКТ-001", Issuer: "Клуб"}, Breeding: b, Recipient: &members.EventParticipant{FullName: "Получатель"}}, "litter_act")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Count(data, []byte("/Type /Page\n")) < 2 {
+		t.Fatal("long litter did not paginate")
+	}
+	if dir := os.Getenv("DOGCLUB_PDF_REVIEW_DIR"); dir != "" {
+		if err = os.MkdirAll(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile(filepath.Join(dir, "litter_act_long.pdf"), data, 0600); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

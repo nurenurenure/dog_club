@@ -64,6 +64,9 @@ func (q *repository) card(ctx context.Context, id int32) (Dog, error) {
 		return Dog{}, err
 	}
 	d := Dog{Summary: summary, OwnerIDs: make([]int32, 0), Titles: make([]Title, 0)}
+	if err := q.tx.QueryRow(ctx, `SELECT registration_date::text FROM dog WHERE dog_id=$1`, id).Scan(&d.RegistrationDate); err != nil {
+		return Dog{}, storageError(err)
+	}
 	rows, err := q.tx.Query(ctx, `SELECT club_member_id FROM dog_club_member WHERE dog_id=$1 ORDER BY club_member_id`, id)
 	if err != nil {
 		return Dog{}, storageError(err)

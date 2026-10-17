@@ -32,7 +32,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if err := Run(ctx, "status", url, &output); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(output.String(), "pending") != 9 || scalar(t, ctx, conn,
+	if strings.Count(output.String(), "pending") != 10 || scalar(t, ctx, conn,
 		`SELECT count(*) FROM pg_tables WHERE schemaname='public'`) != 0 {
 		t.Fatal("status on an empty database must list pending migrations without creating tables")
 	}
@@ -46,19 +46,19 @@ func TestPostgresMigrations(t *testing.T) {
 			t.Fatalf("unexpected migration result: %q", output.String())
 		}
 	}
-	apply("applied 9 migration(s)\n")
+	apply("applied 10 migration(s)\n")
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 59 {
 		t.Fatalf("expected 58 application tables and Goose history, got %d", count)
 	}
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_constraint c JOIN pg_namespace n
-		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 106 {
-		t.Fatalf("expected 99 previous and 7 document FK, got %d", count)
+		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 108 {
+		t.Fatalf("expected 106 previous and 2 breeding-document FK, got %d", count)
 	}
 	checkSeeds(t, ctx, conn)
 	apply("applied 0 migration(s)\n")
 	output.Reset()
-	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 9 {
-		t.Fatalf("expected nine applied versions: %v %q", err, output.String())
+	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 10 {
+		t.Fatalf("expected ten applied versions: %v %q", err, output.String())
 	}
 
 	t.Run("constraints and deletion policies", func(t *testing.T) {
@@ -168,7 +168,7 @@ func TestPostgresMigrations(t *testing.T) {
 		checkSeeds(t, ctx, conn)
 	})
 
-	for range 9 {
+	for range 10 {
 		if err := Run(ctx, "down", url, io.Discard); err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 1 {
 		t.Fatalf("full rollback must leave only Goose history, got %d tables", count)
 	}
-	apply("applied 9 migration(s)\n")
+	apply("applied 10 migration(s)\n")
 	checkSeeds(t, ctx, conn)
 }
 
@@ -439,6 +439,9 @@ func checkSeeds(t *testing.T, ctx context.Context, conn *pgx.Conn) {
 		if table == "document_type" && scalar(t, ctx, conn, `SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='document_file'`) > 0 {
 			count += 2
 		}
+		if table == "document_type" && scalar(t, ctx, conn, `SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='dog' AND column_name='registration_date'`) > 0 {
+			count += 2
+		}
 		if got := scalar(t, ctx, conn, "SELECT count(*) FROM "+pgx.Identifier{table}.Sanitize()); got != count {
 			t.Errorf("%s: expected %d seed rows, got %d", table, count, got)
 		}
@@ -542,6 +545,7 @@ func TestDocumentsUpgradePreservesAmbiguousLegacyLinks(t *testing.T) {
 	if scalar(t, ctx, conn, `SELECT count(*) FROM document WHERE document_id=701 AND document_number='LEGACY-DOC' AND document_given_by='Legacy issuer' AND dog_id=701 AND club_member_id=701 AND document_issue_date='2024-02-02' AND document_expiration_date='2024-01-01' AND subject_member_id IS NULL AND recipient_member_id IS NULL AND category IS NULL AND status='legacy' AND version=1`) != 1 {
 		t.Fatal("legacy facts changed or identity guessed")
 	}
+	rollbackTo(t, ctx, url, 9)
 	if err = Run(ctx, "down", url, io.Discard); err != nil {
 		t.Fatal(err)
 	}
@@ -555,10 +559,52 @@ func TestDocumentsUpgradePreservesAmbiguousLegacyLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	rollbackTo(t, ctx, url, 9)
 	if err = Run(ctx, "down", url, io.Discard); err == nil {
 		t.Fatal("rollback discarded new document")
 	}
 	if scalar(t, ctx, conn, `SELECT count(*) FROM document`) != 2 {
 		t.Fatal("failed rollback lost rows")
+	}
+}
+
+func TestRegistrationUpgradeDoesNotInventDatesOrChangeLegacyDocuments(t *testing.T) {
+	ctx, url, conn := testDatabase(t)
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	rollbackTo(t, ctx, url, 9)
+	_, err := conn.Exec(ctx, `INSERT INTO club_member(club_member_id,club_member_full_name,membership_status_id) VALUES(801,'Legacy registered owner',1);
+ INSERT INTO dog(dog_id,dog_nickname,dog_date_of_birth,dog_identifier_number,dog_status_id,identifier_type_id,dog_breed_id,coat_color_id,sex_id) VALUES(801,'Legacy registered dog','2020-01-01','REG-801',1,1,1,1,1);
+ INSERT INTO document(document_id,document_type_id,document_number,document_given_by,dog_id,recipient_member_id,category,status,version) VALUES(801,3,'OLD-CERTIFICATE','Legacy issuer',801,801,'general','active',4)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM dog WHERE dog_id=801 AND registration_date IS NULL`) != 1 {
+		t.Fatal("registration date guessed")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM document WHERE document_id=801 AND document_number='OLD-CERTIFICATE' AND document_given_by='Legacy issuer' AND status='active' AND version=4 AND recipient_member_id=801 AND breeding_decision_id IS NULL AND litter_id IS NULL`) != 1 {
+		t.Fatal("old document changed")
+	}
+	if err = Run(ctx, "down", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM document WHERE document_id=801 AND version=4`) != 1 {
+		t.Fatal("rollback lost old record")
+	}
+	if err = Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = conn.Exec(ctx, `UPDATE dog SET registration_date='2020-01-02' WHERE dog_id=801`); err != nil {
+		t.Fatal(err)
+	}
+	if err = Run(ctx, "down", url, io.Discard); err == nil {
+		t.Fatal("rollback discarded confirmed date")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM dog WHERE dog_id=801 AND registration_date='2020-01-02'`) != 1 {
+		t.Fatal("failed rollback lost date")
 	}
 }

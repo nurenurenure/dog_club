@@ -18,7 +18,7 @@ func (s *Service) ReadForDocuments(ctx context.Context, tx pgx.Tx, p auth.Princi
 
 // DocumentIdentity returns just the professional/recipient name, no contacts.
 func (s *Service) DocumentIdentity(ctx context.Context, tx pgx.Tx, p auth.Principal, id int32) (EventParticipant, error) {
-	if err := auth.RequireProfile(p, "staff", "veterinarian", "leader", "owner"); err != nil {
+	if err := auth.RequireProfile(p, "staff", "veterinarian", "leader", "owner", "expert"); err != nil {
 		return EventParticipant{}, err
 	}
 	if p.Profile.Role == "owner" {
@@ -31,4 +31,14 @@ func (s *Service) DocumentIdentity(ctx context.Context, tx pgx.Tx, p auth.Princi
 		}
 	}
 	return (&repository{tx}).eventParticipant(ctx, id)
+}
+
+// DocumentSignerName is only for the verified expert attached to a document.
+// No contact, address, membership or account credentials are returned.
+func (s *Service) DocumentSignerName(ctx context.Context, tx pgx.Tx, p auth.Principal, id int32) (string, error) {
+	if err := auth.RequireProfile(p, "staff", "expert", "leader", "owner"); err != nil {
+		return "", err
+	}
+	person, err := (&repository{tx}).eventParticipant(ctx, id)
+	return person.FullName, err
 }

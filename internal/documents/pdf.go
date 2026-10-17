@@ -42,7 +42,7 @@ func render(s sourceSnapshot, kind string) ([]byte, error) {
 		p.MultiCell(0, 5.5, value, "", "L", false)
 		p.Ln(2)
 	}
-	title := map[string]string{"member_card": "Карточка члена клуба", "dog_card": "Карточка собаки", "veterinary_conclusion": "Ветеринарное заключение"}[kind]
+	title := map[string]string{"member_card": "Карточка члена клуба", "dog_card": "Карточка собаки", "veterinary_conclusion": "Ветеринарное заключение", "registration_certificate": "Свидетельство о регистрации собаки", "breeding_conclusion": "Заключение о вязке", "litter_act": "Акт о регистрации помёта"}[kind]
 	p.SetFont("DejaVu", "B", 17)
 	p.MultiCell(0, 8, title, "", "L", false)
 	p.Ln(4)
@@ -76,6 +76,11 @@ func render(s sourceSnapshot, kind string) ([]byte, error) {
 		field("Идентификатор", join(d.Identifier.Type.Name, d.Identifier.Number))
 		if s.Recipient != nil {
 			field("Получатель — владелец", s.Recipient.FullName)
+		}
+		if kind == "registration_certificate" {
+			field("Дата регистрации в клубе", value(d.RegistrationDate))
+			field("Подтверждение", "Собака с указанным идентификатором поставлена на учёт клуба.")
+			field("Подпись уполномоченного сотрудника", "________________________________")
 		}
 		if kind == "dog_card" {
 			field("Рост, см / вес, кг", decimal(d.HeightCM)+" / "+decimal(d.WeightKG))
@@ -122,6 +127,47 @@ func render(s sourceSnapshot, kind string) ([]byte, error) {
 			field("Допуск", "Заключение о допуске не выбрано; из результата осмотра допуск автоматически не следует.")
 		}
 		field("Подпись ветеринарного специалиста", "________________________________")
+	}
+	if b := s.Breeding; b != nil {
+		if b.Personal {
+			field("Вид документа", "Персональная копия")
+			if s.Recipient != nil {
+				field("Получатель", s.Recipient.FullName)
+			}
+		} else {
+			field("Вид документа", "Клубный экземпляр")
+		}
+		field("Мать / самка", fmt.Sprintf("%s; %s; %s: %s", b.Female.Nickname, b.Female.Breed.Name, b.Female.Identifier.Type.Name, b.Female.Identifier.Number))
+		field("Отец / самец", fmt.Sprintf("%s; %s; %s: %s", b.Male.Nickname, b.Male.Breed.Name, b.Male.Identifier.Type.Name, b.Male.Identifier.Number))
+		if decision := b.Decision; decision != nil {
+			field("Основание", fmt.Sprintf("Решение эксперта № %d по заявке № %d от %s", decision.ID, decision.RequestID, decision.DecidedAt.UTC().Format("2006-01-02")))
+			field("Эксперт-кинолог", s.ExpertName)
+			field("Результат решения", map[string]string{"approved": "Разрешено", "rejected": "Отказано"}[decision.Decision])
+			if b.Request != nil {
+				field("Плановая дата вязки", b.Request.PlannedDate)
+				if b.Request.ExpectedBirthDate != nil {
+					field("Ожидаемая дата рождения помёта", *b.Request.ExpectedBirthDate)
+				}
+			}
+			if !b.Personal {
+				field("Обоснование эксперта", decision.Reason)
+			}
+			field("Условия", "Документ воспроизводит указанное решение эксперта. Медицинский допуск и остальные условия повторно проверяются при регистрации фактической вязки.")
+			field("Подпись эксперта-кинолога", "________________________________")
+		}
+		if litter := b.Litter; litter != nil {
+			field("Номер помёта / вязки", fmt.Sprintf("%d / %d", litter.ID, litter.BreedingID))
+			field("Дата рождения помёта", litter.DateOfBirth)
+			field("Общее количество щенков", strconv.Itoa(int(litter.TotalPuppies)))
+			field("Зарегистрировано с идентификаторами", strconv.Itoa(len(b.Puppies)))
+			if litter.IntervalViolation {
+				field("Нарушение интервала между помётами", fmt.Sprintf("Зафиксировано: %d дней вместо не менее 365. Факт рождения сохранён.", *litter.IntervalDays))
+			}
+			for _, puppy := range b.Puppies {
+				field("Зарегистрированный щенок", puppy.Nickname+"; "+puppy.Identifier.Type.Name+": "+puppy.Identifier.Number)
+			}
+			field("Подпись уполномоченного сотрудника", "________________________________")
+		}
 	}
 	var out bytes.Buffer
 	if err := p.Output(&out); err != nil {

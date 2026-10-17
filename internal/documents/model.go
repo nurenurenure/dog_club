@@ -19,14 +19,16 @@ func (e *ValidationError) Error() string { return "invalid document" }
 func invalid(f, m string) error          { return &ValidationError{f, m} }
 
 type Input struct {
-	Number            string  `json:"number"`
-	TypeID            int32   `json:"type_id"`
-	Issuer            string  `json:"issuer"`
-	IssueDate         *string `json:"issue_date"`
-	ExpiresOn         *string `json:"expires_on"`
-	DogID             *int32  `json:"dog_id"`
-	MemberID          *int32  `json:"member_id"`
-	RecipientMemberID *int32  `json:"recipient_member_id"`
+	BreedingDecisionID *int64  `json:"breeding_decision_id,omitempty"`
+	LitterID           *int64  `json:"litter_id,omitempty"`
+	Number             string  `json:"number"`
+	TypeID             int32   `json:"type_id"`
+	Issuer             string  `json:"issuer"`
+	IssueDate          *string `json:"issue_date"`
+	ExpiresOn          *string `json:"expires_on"`
+	DogID              *int32  `json:"dog_id"`
+	MemberID           *int32  `json:"member_id"`
+	RecipientMemberID  *int32  `json:"recipient_member_id"`
 }
 type Correction struct {
 	Version int64  `json:"version"`

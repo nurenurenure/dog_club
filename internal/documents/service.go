@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"dogclub.local/backend/internal/auth"
+	"dogclub.local/backend/internal/breeding"
 	"dogclub.local/backend/internal/dogs"
 	"dogclub.local/backend/internal/members"
 	"dogclub.local/backend/internal/platform/filestore"
@@ -17,27 +18,32 @@ import (
 )
 
 type Service struct {
-	access  *auth.Service
-	members *members.Service
-	dogs    *dogs.Service
-	vet     *veterinary.Service
-	files   *filestore.Store
-	now     func() time.Time
+	access   *auth.Service
+	members  *members.Service
+	dogs     *dogs.Service
+	vet      *veterinary.Service
+	files    *filestore.Store
+	now      func() time.Time
+	breeding *breeding.Service
 }
 
-func NewService(a *auth.Service, m *members.Service, d *dogs.Service, v *veterinary.Service, f *filestore.Store) *Service {
-	return &Service{a, m, d, v, f, time.Now}
+func NewService(a *auth.Service, m *members.Service, d *dogs.Service, v *veterinary.Service, f *filestore.Store, sources ...*breeding.Service) *Service {
+	s := &Service{access: a, members: m, dogs: d, vet: v, files: f, now: time.Now}
+	if len(sources) > 0 {
+		s.breeding = sources[0]
+	}
+	return s
 }
 
-var readRoles = []string{"staff", "veterinarian", "leader", "owner"}
+var readRoles = []string{"staff", "veterinarian", "leader", "owner", "expert"}
 
 func domainError(err error) error {
-	for _, e := range []error{members.ErrNotFound, dogs.ErrNotFound, veterinary.ErrNotFound} {
+	for _, e := range []error{members.ErrNotFound, dogs.ErrNotFound, veterinary.ErrNotFound, breeding.ErrNotFound} {
 		if errors.Is(err, e) {
 			return ErrNotFound
 		}
 	}
-	for _, e := range []error{members.ErrUnavailable, dogs.ErrUnavailable, veterinary.ErrUnavailable, filestore.ErrUnavailable} {
+	for _, e := range []error{members.ErrUnavailable, dogs.ErrUnavailable, veterinary.ErrUnavailable, filestore.ErrUnavailable, breeding.ErrUnavailable} {
 		if errors.Is(err, e) {
 			return ErrUnavailable
 		}
@@ -45,7 +51,8 @@ func domainError(err error) error {
 	var m *members.ValidationError
 	var d *dogs.ValidationError
 	var v *veterinary.ValidationError
-	if errors.As(err, &m) || errors.As(err, &d) || errors.As(err, &v) {
+	var b *breeding.ValidationError
+	if errors.As(err, &m) || errors.As(err, &d) || errors.As(err, &v) || errors.As(err, &b) {
 		return invalid("source", "Проверьте исходные данные документа.")
 	}
 	return err
@@ -88,6 +95,9 @@ func (s *Service) read(ctx context.Context, q *repository, p auth.Principal, id 
 		d.LegacyMemberID = nil
 	}
 	if p.Profile.Role == "veterinarian" && ((d.Status == "legacy" && category(d.TypeName) != "medical") || (d.Status != "legacy" && (d.Category == nil || *d.Category != "medical"))) {
+		return Document{}, ErrNotFound
+	}
+	if p.Profile.Role == "expert" && category(d.TypeName) != "breeding" {
 		return Document{}, ErrNotFound
 	}
 	d.Expired = d.ExpiresOn != nil && *d.ExpiresOn < s.now().UTC().Format(time.DateOnly)
@@ -138,9 +148,18 @@ func (s *Service) Get(ctx context.Context, p auth.Principal, id int32) (Document
 }
 func (s *Service) Types(ctx context.Context, p auth.Principal) ([]DocumentType, error) {
 	var out []DocumentType
-	err := s.with(ctx, p, readRoles, func(ctx context.Context, q *repository, _ auth.Principal) error {
+	err := s.with(ctx, p, readRoles, func(ctx context.Context, q *repository, p auth.Principal) error {
 		var e error
 		out, e = q.types(ctx)
+		if p.Profile.Role == "expert" {
+			filtered := []DocumentType{}
+			for _, item := range out {
+				if item.Category == "breeding" {
+					filtered = append(filtered, item)
+				}
+			}
+			out = filtered
+		}
 		return e
 	})
 	return out, err
@@ -167,7 +186,7 @@ func (s *Service) List(ctx context.Context, p auth.Principal, f Filter) (Page[Do
 				return err
 			}
 		}
-		ids, err := q.list(ctx, f, own, dogIDs, p.Profile.Role == "veterinarian")
+		ids, err := q.list(ctx, f, own, dogIDs, p.Profile.Role == "veterinarian", p.Profile.Role == "expert")
 		if err != nil {
 			return err
 		}
@@ -239,6 +258,25 @@ func (s *Service) references(ctx context.Context, q *repository, p auth.Principa
 			}
 		}
 	}
+	if cat == "breeding" {
+		if in.DogID == nil || s.breeding == nil {
+			return "", invalid("basis", "Укажите собаку и племенное основание.")
+		}
+		name := ""
+		for _, t := range types {
+			if t.ID == in.TypeID {
+				name = t.Name
+			}
+		}
+		if name == "Заключение о вязке" && (in.BreedingDecisionID == nil || in.LitterID != nil) || name == "Акт о регистрации помёта" && (in.LitterID == nil || in.BreedingDecisionID != nil) {
+			return "", invalid("basis", "Основание не соответствует типу документа.")
+		}
+		if _, err := s.breeding.ReadForDocuments(ctx, q.tx, p, *in.DogID, in.BreedingDecisionID, in.LitterID, in.RecipientMemberID != nil, false); err != nil {
+			return "", domainError(err)
+		}
+	} else if in.BreedingDecisionID != nil || in.LitterID != nil {
+		return "", invalid("basis", "Этот тип документа не использует племенные основания.")
+	}
 	return cat, nil
 }
 func (s *Service) Create(ctx context.Context, p auth.Principal, in Input) (Document, error) {
@@ -294,7 +332,7 @@ func (s *Service) Update(ctx context.Context, p auth.Principal, id int32, in Upd
 		if before.Version != in.Version || before.Status == "void" {
 			return ErrConflict
 		}
-		if len(before.Files) > 0 && (!same(before.DogID, in.DogID) || !same(before.MemberID, in.MemberID) || !same(before.RecipientMemberID, in.RecipientMemberID) || before.TypeID != in.TypeID) {
+		if len(before.Files) > 0 && (!same(before.DogID, in.DogID) || !same(before.MemberID, in.MemberID) || !same(before.RecipientMemberID, in.RecipientMemberID) || before.TypeID != in.TypeID || !same64(before.BreedingDecisionID, in.BreedingDecisionID) || !same64(before.LitterID, in.LitterID)) {
 			return invalid("subject", "Документ с файлами нельзя переносить другому получателю, объекту или типу.")
 		}
 		cat, err := s.references(ctx, q, p, in.Input)
@@ -371,3 +409,5 @@ func (s *Service) History(ctx context.Context, p auth.Principal, id int32, f Fil
 	})
 	return out, err
 }
+
+func same64(a, b *int64) bool { return a == nil && b == nil || a != nil && b != nil && *a == *b }

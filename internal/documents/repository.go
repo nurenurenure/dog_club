@@ -50,7 +50,7 @@ func (q *repository) types(ctx context.Context) ([]DocumentType, error) {
 }
 func (q *repository) get(ctx context.Context, id int32) (Document, error) {
 	d := Document{Files: []File{}}
-	err := q.tx.QueryRow(ctx, `SELECT d.document_id,COALESCE(d.document_number,''),d.document_type_id,t.document_type_name,COALESCE(d.document_given_by,''),d.document_issue_date::text,d.document_expiration_date::text,d.dog_id,d.subject_member_id,d.recipient_member_id,d.category,d.status,d.version,d.club_member_id FROM document d JOIN document_type t USING(document_type_id) WHERE document_id=$1`, id).Scan(&d.ID, &d.Number, &d.TypeID, &d.TypeName, &d.Issuer, &d.IssueDate, &d.ExpiresOn, &d.DogID, &d.MemberID, &d.RecipientMemberID, &d.Category, &d.Status, &d.Version, &d.LegacyMemberID)
+	err := q.tx.QueryRow(ctx, `SELECT d.document_id,COALESCE(d.document_number,''),d.document_type_id,t.document_type_name,COALESCE(d.document_given_by,''),d.document_issue_date::text,d.document_expiration_date::text,d.dog_id,d.subject_member_id,d.recipient_member_id,d.category,d.status,d.version,d.club_member_id,d.breeding_decision_id,d.litter_id FROM document d JOIN document_type t USING(document_type_id) WHERE document_id=$1`, id).Scan(&d.ID, &d.Number, &d.TypeID, &d.TypeName, &d.Issuer, &d.IssueDate, &d.ExpiresOn, &d.DogID, &d.MemberID, &d.RecipientMemberID, &d.Category, &d.Status, &d.Version, &d.LegacyMemberID, &d.BreedingDecisionID, &d.LitterID)
 	if err != nil {
 		return d, storageError(err)
 	}
@@ -70,10 +70,10 @@ func (q *repository) get(ctx context.Context, id int32) (Document, error) {
 }
 func (q *repository) save(ctx context.Context, id int32, in Input, cat string) (int32, error) {
 	if id == 0 {
-		err := q.tx.QueryRow(ctx, `INSERT INTO document(document_number,document_type_id,document_given_by,document_issue_date,document_expiration_date,dog_id,subject_member_id,recipient_member_id,category,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'active') RETURNING document_id`, in.Number, in.TypeID, in.Issuer, in.IssueDate, in.ExpiresOn, in.DogID, in.MemberID, in.RecipientMemberID, cat).Scan(&id)
+		err := q.tx.QueryRow(ctx, `INSERT INTO document(document_number,document_type_id,document_given_by,document_issue_date,document_expiration_date,dog_id,subject_member_id,recipient_member_id,category,status,breeding_decision_id,litter_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',$10,$11) RETURNING document_id`, in.Number, in.TypeID, in.Issuer, in.IssueDate, in.ExpiresOn, in.DogID, in.MemberID, in.RecipientMemberID, cat, in.BreedingDecisionID, in.LitterID).Scan(&id)
 		return id, storageError(err)
 	}
-	_, err := q.tx.Exec(ctx, `UPDATE document SET document_number=$2,document_type_id=$3,document_given_by=$4,document_issue_date=$5,document_expiration_date=$6,dog_id=$7,subject_member_id=$8,recipient_member_id=$9,category=$10,status='active' WHERE document_id=$1`, id, in.Number, in.TypeID, in.Issuer, in.IssueDate, in.ExpiresOn, in.DogID, in.MemberID, in.RecipientMemberID, cat)
+	_, err := q.tx.Exec(ctx, `UPDATE document SET document_number=$2,document_type_id=$3,document_given_by=$4,document_issue_date=$5,document_expiration_date=$6,dog_id=$7,subject_member_id=$8,recipient_member_id=$9,category=$10,status='active',breeding_decision_id=$11,litter_id=$12 WHERE document_id=$1`, id, in.Number, in.TypeID, in.Issuer, in.IssueDate, in.ExpiresOn, in.DogID, in.MemberID, in.RecipientMemberID, cat, in.BreedingDecisionID, in.LitterID)
 	return id, storageError(err)
 }
 func (q *repository) bump(ctx context.Context, id int32, version int64) error {
@@ -103,8 +103,8 @@ func (q *repository) record(ctx context.Context, p auth.Principal, d Document, a
 	_, err = q.tx.Exec(ctx, `INSERT INTO document_changes(document_id,actor_user_id,actor_profile_id,action,reason,before_data,after_data,request_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, d.ID, p.User.ID, p.Profile.ID, action, reason, old, next, auth.RequestID(ctx))
 	return storageError(err)
 }
-func (q *repository) list(ctx context.Context, f Filter, owner *int32, dogs []int32, vet bool) ([]int32, error) {
-	rows, err := q.tx.Query(ctx, `SELECT document_id FROM document WHERE document_id>$1 AND ($2::integer=0 OR document_type_id=$2) AND ($3::integer=0 OR dog_id=$3) AND ($4::integer=0 OR subject_member_id=$4 OR recipient_member_id=$4) AND ($5::text='' OR position(lower($5) IN lower(COALESCE(document_number,'')))>0) AND ($6::date IS NULL OR document_issue_date>=$6) AND ($7::date IS NULL OR document_issue_date<=$7) AND ($8::integer IS NULL OR (status<>'legacy' AND (subject_member_id=$8 OR (dog_id=ANY($9::integer[]) AND recipient_member_id=$8)))) AND (NOT $10 OR category='medical' OR (status='legacy' AND document_type_id IN (SELECT document_type_id FROM document_type WHERE document_type_name IN ('Ветеринарный паспорт','Ветеринарная справка','Документ о результатах обследования')))) ORDER BY document_id LIMIT $11`, f.After, f.TypeID, f.DogID, f.MemberID, f.Number, f.From, f.To, owner, dogs, vet, f.Limit+1)
+func (q *repository) list(ctx context.Context, f Filter, owner *int32, dogs []int32, vet, expert bool) ([]int32, error) {
+	rows, err := q.tx.Query(ctx, `SELECT document_id FROM document WHERE document_id>$1 AND ($2::integer=0 OR document_type_id=$2) AND ($3::integer=0 OR dog_id=$3) AND ($4::integer=0 OR subject_member_id=$4 OR recipient_member_id=$4) AND ($5::text='' OR position(lower($5) IN lower(COALESCE(document_number,'')))>0) AND ($6::date IS NULL OR document_issue_date>=$6) AND ($7::date IS NULL OR document_issue_date<=$7) AND ($8::integer IS NULL OR (status<>'legacy' AND (subject_member_id=$8 OR (dog_id=ANY($9::integer[]) AND recipient_member_id=$8)))) AND (NOT $10 OR category='medical' OR (status='legacy' AND document_type_id IN (SELECT document_type_id FROM document_type WHERE document_type_name IN ('Ветеринарный паспорт','Ветеринарная справка','Документ о результатах обследования')))) AND (NOT $12 OR category='breeding') ORDER BY document_id LIMIT $11`, f.After, f.TypeID, f.DogID, f.MemberID, f.Number, f.From, f.To, owner, dogs, vet, f.Limit+1, expert)
 	if err != nil {
 		return nil, storageError(err)
 	}

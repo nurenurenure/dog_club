@@ -32,3 +32,12 @@ func (s *Service) ListForDocuments(ctx context.Context, tx pgx.Tx, p auth.Princi
 	}
 	return (&repository{tx}).list(ctx, Filter{OwnerID: memberID, After: int32(after), Limit: 100})
 }
+
+// BreedingDocumentAnimal returns no owners or contacts. The breeding service
+// must establish the request/litter relationship and check owner access first.
+func (s *Service) BreedingDocumentAnimal(ctx context.Context, tx pgx.Tx, p auth.Principal, id int32) (Summary, error) {
+	if err := auth.RequireProfile(p, "staff", "expert", "leader", "owner"); err != nil {
+		return Summary{}, err
+	}
+	return (&repository{tx}).summary(ctx, id)
+}

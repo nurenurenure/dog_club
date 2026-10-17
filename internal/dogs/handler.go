@@ -25,6 +25,7 @@ func (h *Handler) RegisterRoutes(router chi.Router) {
 		r.Patch("/dogs/{dogID}", h.patch)
 		r.Get("/dogs/{dogID}/history", h.history)
 		r.Put("/dogs/{dogID}/owners", h.owners)
+		r.Put("/dogs/{dogID}/registration", h.registration)
 		r.Put("/dogs/{dogID}/pedigree", h.pedigree)
 		r.Post("/dogs/{dogID}/titles", h.title)
 		r.Put("/dogs/{dogID}/titles/{titleID}", h.updateTitle)
@@ -229,4 +230,22 @@ func (h *Handler) history(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) dictionaries(w http.ResponseWriter, r *http.Request) {
 	d, err := h.service.Dictionaries(r.Context(), auth.PrincipalFrom(r))
 	respond(w, r, d, err)
+}
+
+func (h *Handler) registration(w http.ResponseWriter, r *http.Request) {
+	id, ok := positiveID(w, r, "dogID")
+	if !ok {
+		return
+	}
+	var in RegistrationInput
+	if problem := httpapi.DecodeJSONLimit(w, r, &in, 16<<10); problem != nil {
+		httpapi.WriteProblem(w, r, problem)
+		return
+	}
+	out, err := h.service.SetRegistrationDate(r.Context(), auth.PrincipalFrom(r), id, in)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	httpapi.WriteJSON(w, 200, out)
 }

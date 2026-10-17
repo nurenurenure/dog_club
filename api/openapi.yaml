@@ -1231,6 +1231,11 @@ components:
                     uniqueItems: true
                 pedigree:
                     $ref: '#/components/schemas/DogPedigree'
+                registration_date:
+                    format: date
+                    type:
+                        - string
+                        - "null"
                 sex:
                     $ref: '#/components/schemas/DogDictionary'
                 status:
@@ -4615,11 +4620,18 @@ components:
         Document:
             additionalProperties: false
             properties:
+                breeding_decision_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
                 category:
                     enum:
                         - general
                         - medical
                         - null
+                        - breeding
                     type:
                         - string
                         - "null"
@@ -4654,6 +4666,12 @@ components:
                     type: string
                 legacy_member_id:
                     format: int32
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                litter_id:
+                    format: int64
                     minimum: 1
                     type:
                         - integer
@@ -4805,6 +4823,9 @@ components:
                         - dog_card
                         - veterinary_conclusion
                         - null
+                        - registration_certificate
+                        - breeding_conclusion
+                        - litter_act
                     type:
                         - string
                         - "null"
@@ -4844,6 +4865,9 @@ components:
                         - member_card
                         - dog_card
                         - veterinary_conclusion
+                        - registration_certificate
+                        - breeding_conclusion
+                        - litter_act
                     type: string
                 version:
                     format: int64
@@ -4874,6 +4898,12 @@ components:
         DocumentInput:
             additionalProperties: false
             properties:
+                breeding_decision_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
                 dog_id:
                     format: int32
                     minimum: 1
@@ -4893,6 +4923,12 @@ components:
                 issuer:
                     maxLength: 2000
                     type: string
+                litter_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
                 member_id:
                     format: int32
                     minimum: 1
@@ -4939,6 +4975,7 @@ components:
                     enum:
                         - general
                         - medical
+                        - breeding
                     type: string
                 id:
                     format: int32
@@ -4954,6 +4991,12 @@ components:
         DocumentUpdate:
             additionalProperties: false
             properties:
+                breeding_decision_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
                 dog_id:
                     format: int32
                     minimum: 1
@@ -4973,6 +5016,12 @@ components:
                 issuer:
                     maxLength: 2000
                     type: string
+                litter_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
                 member_id:
                     format: int32
                     minimum: 1
@@ -5005,6 +5054,27 @@ components:
                 - version
                 - reason
             type: object
+        DogRegistrationInput:
+            additionalProperties: false
+            properties:
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                registration_date:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+                - registration_date
+            type: object
     securitySchemes:
         bearerAuth:
             bearerFormat: JWT
@@ -5015,9 +5085,9 @@ components:
             name: dogclub_refresh
             type: apiKey
 info:
-    description: Этапы 04–09 и первая часть 10. Реестр документов, закрытые файлы и три PDF-формы; права на оформление и скачивание, версии, история и снимки источников. Аккаунты и профили, члены клуба, собаки, ветеринария, племенной учёт и мероприятия. Сотрудник регистрирует участников; назначенный эксперт проверяет квалификацию и вводит результаты. Люди без собак, независимые площадки, классы, расписание, возраст на дату выступления и медицинский допуск на период участия. Версии, причины, история и снимки фактов. Строгий JSON, RFC 9457.
+    description: Этапы 04–09 и части 1–2 этапа 10. Закрытые документы, шесть PDF-форм, подтверждённая дата регистрации собаки, решения эксперта и факты помётов. Разделение клубных и персональных копий, права, версии, история и снимки источников.
     title: Клуб собаководства — backend
-    version: 0.10.0
+    version: 0.10.1
 openapi: 3.1.1
 paths:
     /api/v1/breeding-requests:
@@ -13429,5 +13499,61 @@ paths:
                 - bearerAuth: []
             tags:
                 - Documents
+    /api/v1/dogs/{dogID}/registration:
+        put:
+            description: Минимум один существующий член клуба; аккаунт и активное членство для записи владения не обязательны. Доступ определяется текущим составом владельцев при каждом запросе.
+            operationId: setDogRegistrationDate
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/DogRegistrationInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Dog'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Подтвердить, исправить или снять подтверждение даты регистрации собаки
+            tags:
+                - Dogs
 servers:
     - url: http://127.0.0.1:8080

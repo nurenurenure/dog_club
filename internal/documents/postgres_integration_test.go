@@ -126,7 +126,7 @@ func TestDocumentsRegistryFilesFormsAndRevocation(t *testing.T) {
 	dog := newDog("DOC-0001", "2023-03-01", person.ID)
 	types, err := s.Types(ctx, staff)
 	must(err)
-	if len(types) != 9 {
+	if len(types) != 11 {
 		t.Fatal("document types missing")
 	}
 	typeID := func(name string) int32 {
@@ -161,7 +161,7 @@ func TestDocumentsRegistryFilesFormsAndRevocation(t *testing.T) {
 	_, _, err = s.Download(ctx, otherOwner, doc.ID, f.ID)
 	expect(err, ErrNotFound)
 	_, err = s.Get(ctx, expert, doc.ID)
-	expect(err, auth.ErrForbidden)
+	expect(err, ErrNotFound)
 	_, err = s.Get(ctx, admin, doc.ID)
 	expect(err, auth.ErrForbidden)
 	_, err = s.Get(ctx, vet, doc.ID)

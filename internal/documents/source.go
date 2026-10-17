@@ -4,12 +4,15 @@ import (
 	"context"
 
 	"dogclub.local/backend/internal/auth"
+	"dogclub.local/backend/internal/breeding"
 	"dogclub.local/backend/internal/dogs"
 	"dogclub.local/backend/internal/members"
 	"dogclub.local/backend/internal/veterinary"
 )
 
 type sourceSnapshot struct {
+	ExpertName   string                     `json:"expert_name,omitempty"`
+	Breeding     *breeding.DocumentSource   `json:"breeding,omitempty"`
 	Document     Input                      `json:"document"`
 	Member       *members.Member            `json:"member"`
 	Dogs         []dogs.Summary             `json:"dogs"`
@@ -21,7 +24,50 @@ type sourceSnapshot struct {
 
 func (s *Service) source(ctx context.Context, q *repository, p auth.Principal, d Document, in Generate, issuing bool) (sourceSnapshot, error) {
 	out := sourceSnapshot{Document: d.Input, Dogs: []dogs.Summary{}, Vaccinations: []veterinary.Vaccination{}}
+	if issuing {
+		if _, err := s.references(ctx, q, p, d.Input); err != nil {
+			return out, err
+		}
+	}
+	if (d.BreedingDecisionID != nil || d.LitterID != nil) && in.Template != "breeding_conclusion" && in.Template != "litter_act" {
+		return out, invalid("template", "Выберите соответствующую племенную форму.")
+	}
 	switch in.Template {
+	case "breeding_conclusion", "litter_act":
+		if d.DogID == nil || in.ExaminationID != nil || in.ClearanceID != nil || s.breeding == nil {
+			return out, invalid("basis", "Укажите племенное основание без медицинских ID.")
+		}
+		if in.Template == "breeding_conclusion" && (d.TypeName != "Заключение о вязке" || d.BreedingDecisionID == nil) || in.Template == "litter_act" && (d.TypeName != "Акт о регистрации помёта" || d.LitterID == nil) {
+			return out, invalid("template", "Форма не соответствует типу и основанию.")
+		}
+		basis, err := s.breeding.ReadForDocuments(ctx, q.tx, p, *d.DogID, d.BreedingDecisionID, d.LitterID, d.RecipientMemberID != nil, issuing)
+		if err != nil {
+			return out, domainError(err)
+		}
+		out.Breeding = &basis
+		if basis.Decision != nil {
+			expert, err := s.access.DocumentExpert(ctx, q.tx, p, basis.Decision.ActorProfileID)
+			if err != nil {
+				return out, err
+			}
+			out.ExpertName = "ФИО не указано"
+			if expert.MemberID != nil {
+				name, err := s.members.DocumentSignerName(ctx, q.tx, p, *expert.MemberID)
+				if err != nil {
+					return out, domainError(err)
+				}
+				out.ExpertName = name
+			}
+		}
+
+		if d.RecipientMemberID != nil {
+			person, err := s.members.DocumentIdentity(ctx, q.tx, p, *d.RecipientMemberID)
+			if err != nil {
+				return out, domainError(err)
+			}
+			out.Recipient = &person
+		}
+
 	case "member_card":
 		if d.MemberID == nil || d.TypeName != "Карточка члена клуба" || in.ExaminationID != nil || in.ClearanceID != nil {
 			return out, invalid("template", "Выберите тип карточки члена клуба и человека.")
@@ -46,7 +92,7 @@ func (s *Service) source(ctx context.Context, q *repository, p auth.Principal, d
 			}
 			after = int64(*page.NextAfter)
 		}
-	case "dog_card", "veterinary_conclusion":
+	case "dog_card", "veterinary_conclusion", "registration_certificate":
 		if d.DogID == nil {
 			return out, invalid("dog_id", "Укажите собаку.")
 		}
@@ -62,7 +108,14 @@ func (s *Service) source(ctx context.Context, q *repository, p auth.Principal, d
 			}
 			out.Recipient = &person
 		}
-		if in.Template == "dog_card" {
+		if in.Template == "registration_certificate" {
+			if d.TypeName != "Регистрационное свидетельство" || d.RecipientMemberID == nil || in.ExaminationID != nil || in.ClearanceID != nil {
+				return out, invalid("template", "Укажите регистрационное свидетельство и получателя-владельца.")
+			}
+			if issuing && dog.RegistrationDate == nil {
+				return out, invalid("registration_date", "Сначала подтвердите дату регистрации собаки.")
+			}
+		} else if in.Template == "dog_card" {
 			if d.TypeName != "Карточка собаки" || in.ExaminationID != nil || in.ClearanceID != nil {
 				return out, invalid("template", "Выберите тип карточки собаки без медицинского основания.")
 			}
