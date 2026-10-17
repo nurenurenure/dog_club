@@ -259,6 +259,28 @@ components:
                     $ref: '#/components/headers/NoStore'
                 X-Request-ID:
                     $ref: '#/components/headers/RequestID'
+        EventConflict:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Конфликт версии, состояния, дубликат участия или попытка изменить зафиксированный факт.
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
+        EventsUnavailable:
+            content:
+                application/problem+json:
+                    schema:
+                        $ref: '#/components/schemas/Problem'
+            description: Учёт мероприятий временно недоступен.
+            headers:
+                Cache-Control:
+                    $ref: '#/components/headers/NoStore'
+                X-Request-ID:
+                    $ref: '#/components/headers/RequestID'
     schemas:
         BreedingAnimal:
             additionalProperties: false
@@ -3214,6 +3236,8 @@ components:
                         - veterinary_unavailable
                         - breeding_conflict
                         - breeding_unavailable
+                        - event_conflict
+                        - events_unavailable
                     type: string
                 detail:
                     description: Безопасное описание ошибки без внутренних технических деталей
@@ -3355,6 +3379,1237 @@ components:
             required:
                 - users
             type: object
+        Event:
+            additionalProperties: false
+            properties:
+                rules_version:
+                    type: integer
+                    minimum: 1
+                    format: int64
+                audience:
+                    enum:
+                        - dogs
+                        - people
+                        - mixed
+                        - null
+                    type:
+                        - string
+                        - "null"
+                classes:
+                    items:
+                        $ref: '#/components/schemas/EventClass'
+                    type: array
+                description:
+                    type: string
+                ends_at:
+                    format: date-time
+                    type:
+                        - string
+                        - "null"
+                expert_profile_ids:
+                    items:
+                        type: string
+                    type: array
+                id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                legacy_ends_at:
+                    type:
+                        - string
+                        - "null"
+                legacy_starts_at:
+                    description: Исходная дата/время без часового пояса; не трактуется как UTC.
+                    type:
+                        - string
+                        - "null"
+                name:
+                    type: string
+                schedule:
+                    items:
+                        $ref: '#/components/schemas/EventSchedule'
+                    type: array
+                starts_at:
+                    format: date-time
+                    type:
+                        - string
+                        - "null"
+                status:
+                    enum:
+                        - draft
+                        - open
+                        - closed
+                        - in_progress
+                        - completed
+                        - cancelled
+                    type: string
+                timezone:
+                    type:
+                        - string
+                        - "null"
+                type:
+                    $ref: '#/components/schemas/DogDictionary'
+                uses_classes:
+                    type: boolean
+                venue:
+                    anyOf:
+                        - $ref: '#/components/schemas/EventVenue'
+                        - type: "null"
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - rules_version
+                - id
+                - name
+                - description
+                - type
+                - venue
+                - starts_at
+                - ends_at
+                - timezone
+                - audience
+                - uses_classes
+                - status
+                - version
+                - legacy_starts_at
+                - legacy_ends_at
+                - classes
+                - schedule
+                - expert_profile_ids
+            type: object
+        EventAnimal:
+            additionalProperties: false
+            properties:
+                breed:
+                    $ref: '#/components/schemas/DogDictionary'
+                coat_color:
+                    $ref: '#/components/schemas/DogDictionary'
+                date_of_birth:
+                    format: date
+                    type: string
+                height_cm:
+                    maximum: 99999.99
+                    minimum: 0.01
+                    multipleOf: 0.01
+                    type:
+                        - number
+                        - "null"
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                identifier:
+                    $ref: '#/components/schemas/DogIdentifier'
+                nickname:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                pedigree_issuer:
+                    type: string
+                pedigree_number:
+                    type: string
+                sex:
+                    $ref: '#/components/schemas/DogDictionary'
+                status:
+                    $ref: '#/components/schemas/DogDictionary'
+                titles:
+                    items:
+                        $ref: '#/components/schemas/DogTitle'
+                    type: array
+                version:
+                    description: Последняя версия всей карточки собаки; обязательна для каждой мутации.
+                    format: int64
+                    minimum: 1
+                    type: integer
+                weight_kg:
+                    maximum: 99999.99
+                    minimum: 0.01
+                    multipleOf: 0.01
+                    type:
+                        - number
+                        - "null"
+            required:
+                - pedigree_number
+                - pedigree_issuer
+                - titles
+                - id
+                - nickname
+                - date_of_birth
+                - identifier
+                - status
+                - breed
+                - coat_color
+                - sex
+                - height_cm
+                - weight_kg
+                - version
+            type: object
+        EventChange:
+            additionalProperties: false
+            properties:
+                action:
+                    type: string
+                actor_profile_id:
+                    type: string
+                actor_user_id:
+                    type: string
+                after:
+                    type:
+                        - object
+                        - "null"
+                before:
+                    type:
+                        - object
+                        - "null"
+                changed_at:
+                    format: date-time
+                    type: string
+                entity:
+                    enum:
+                        - venue
+                        - event
+                        - class
+                        - schedule
+                        - registration
+                        - result
+                    type: string
+                entity_id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                event_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                reason:
+                    type: string
+                request_id:
+                    type: string
+            required:
+                - id
+                - event_id
+                - entity
+                - entity_id
+                - actor_user_id
+                - actor_profile_id
+                - action
+                - reason
+                - before
+                - after
+                - request_id
+                - changed_at
+            type: object
+        EventChangePage:
+            additionalProperties: false
+            properties:
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                records:
+                    items:
+                        $ref: '#/components/schemas/EventChange'
+                    type: array
+            required:
+                - records
+                - next_after
+            type: object
+        EventClass:
+            additionalProperties: false
+            properties:
+                enabled:
+                    type: boolean
+                event_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                max_age_months:
+                    maximum: 1200
+                    minimum: 0
+                    type:
+                        - integer
+                        - "null"
+                min_age_months:
+                    maximum: 1200
+                    minimum: 0
+                    type:
+                        - integer
+                        - "null"
+                name:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                requirements:
+                    maxLength: 2000
+                    type: string
+                requires_expert:
+                    type: boolean
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - event_id
+                - name
+                - min_age_months
+                - max_age_months
+                - requirements
+                - requires_expert
+                - enabled
+                - version
+            type: object
+        EventClassCommand:
+            additionalProperties: false
+            properties:
+                enabled:
+                    type: boolean
+                max_age_months:
+                    maximum: 1200
+                    minimum: 0
+                    type:
+                        - integer
+                        - "null"
+                min_age_months:
+                    maximum: 1200
+                    minimum: 0
+                    type:
+                        - integer
+                        - "null"
+                name:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                requirements:
+                    maxLength: 2000
+                    type: string
+                requires_expert:
+                    type: boolean
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - name
+                - enabled
+                - requires_expert
+                - version
+                - reason
+            type: object
+        EventCorrection:
+            additionalProperties: false
+            properties:
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+            type: object
+        EventDictionaries:
+            additionalProperties: false
+            properties:
+                classes:
+                    items:
+                        $ref: '#/components/schemas/DogDictionary'
+                    type: array
+                grades:
+                    items:
+                        $ref: '#/components/schemas/DogDictionary'
+                    type: array
+                types:
+                    items:
+                        $ref: '#/components/schemas/DogDictionary'
+                    type: array
+            required:
+                - types
+                - classes
+                - grades
+            type: object
+        EventEligibility:
+            additionalProperties: false
+            properties:
+                blocking_reasons:
+                    items:
+                        enum:
+                            - event_unconfigured
+                            - schedule_missing
+                            - schedule_disabled
+                            - schedule_outside_event
+                            - schedule_class_mismatch
+                            - event_cancelled
+                            - event_draft
+                            - registration_cancelled
+                            - dog_required
+                            - people_only
+                            - identifier_missing
+                            - representative_not_owner
+                            - class_required
+                            - classes_not_used
+                            - class_missing
+                            - class_disabled
+                            - age_not_allowed
+                            - medical_clearance
+                            - qualification_required
+                        type: string
+                    type: array
+                checked_at:
+                    format: date-time
+                    type: string
+                class:
+                    anyOf:
+                        - $ref: '#/components/schemas/EventClass'
+                        - type: "null"
+                dog:
+                    anyOf:
+                        - $ref: '#/components/schemas/EventAnimal'
+                        - type: "null"
+                ends_at:
+                    format: date-time
+                    type: string
+                event_version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                local_date:
+                    type: string
+                medical:
+                    anyOf:
+                        - $ref: '#/components/schemas/MedicalAdmission'
+                        - type: "null"
+                qualification_current:
+                    type: boolean
+                starts_at:
+                    format: date-time
+                    type: string
+            required:
+                - checked_at
+                - starts_at
+                - ends_at
+                - local_date
+                - event_version
+                - class
+                - dog
+                - medical
+                - qualification_current
+                - blocking_reasons
+            type: object
+        EventExpertOption:
+            additionalProperties: false
+            properties:
+                display_name:
+                    type: string
+                profile_id:
+                    type: string
+            required:
+                - profile_id
+                - display_name
+            type: object
+        EventExpertOptions:
+            items:
+                $ref: '#/components/schemas/EventExpertOption'
+            type: array
+        EventExpertsInput:
+            additionalProperties: false
+            properties:
+                profile_ids:
+                    items:
+                        maxLength: 100
+                        minLength: 1
+                        type: string
+                    maxItems: 100
+                    type: array
+                    uniqueItems: true
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+                - profile_ids
+            type: object
+        EventInput:
+            additionalProperties: false
+            properties:
+                audience:
+                    enum:
+                        - dogs
+                        - people
+                        - mixed
+                    type: string
+                description:
+                    maxLength: 4000
+                    type: string
+                ends_at:
+                    format: date-time
+                    type: string
+                name:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                starts_at:
+                    format: date-time
+                    type: string
+                timezone:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                type_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                uses_classes:
+                    type: boolean
+                venue_id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - name
+                - type_id
+                - venue_id
+                - starts_at
+                - ends_at
+                - timezone
+                - audience
+                - uses_classes
+            type: object
+        EventPage:
+            additionalProperties: false
+            properties:
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                records:
+                    items:
+                        $ref: '#/components/schemas/Event'
+                    type: array
+            required:
+                - records
+                - next_after
+            type: object
+        EventParticipant:
+            additionalProperties: false
+            properties:
+                full_name:
+                    type: string
+                id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - full_name
+            type: object
+        EventQualificationInput:
+            additionalProperties: false
+            properties:
+                decision:
+                    enum:
+                        - approved
+                        - rejected
+                    type: string
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+                - decision
+            type: object
+        EventRegistration:
+            additionalProperties: false
+            properties:
+                attendance:
+                    anyOf:
+                        - $ref: '#/components/schemas/EventEligibility'
+                        - type: "null"
+                class_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                dog:
+                    anyOf:
+                        - $ref: '#/components/schemas/EventAnimal'
+                        - type: "null"
+                dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                eligibility:
+                    anyOf:
+                        - $ref: '#/components/schemas/EventEligibility'
+                        - type: "null"
+                event_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                member_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                participant:
+                    anyOf:
+                        - $ref: '#/components/schemas/EventParticipant'
+                        - type: "null"
+                qualification:
+                    enum:
+                        - pending
+                        - approved
+                        - rejected
+                    type: string
+                qualification_reason:
+                    type: string
+                qualifier_profile_id:
+                    type:
+                        - string
+                        - "null"
+                schedule_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                status:
+                    enum:
+                        - registered
+                        - attended
+                        - cancelled
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - event_id
+                - member_id
+                - dog_id
+                - class_id
+                - schedule_id
+                - participant
+                - dog
+                - status
+                - qualification
+                - qualifier_profile_id
+                - qualification_reason
+                - attendance
+                - eligibility
+                - version
+            type: object
+        EventRegistrationInput:
+            additionalProperties: false
+            properties:
+                class_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                member_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                schedule_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+            required:
+                - member_id
+            type: object
+        EventRegistrationPage:
+            additionalProperties: false
+            properties:
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                records:
+                    items:
+                        $ref: '#/components/schemas/EventRegistration'
+                    type: array
+            required:
+                - records
+                - next_after
+            type: object
+        EventRegistrationUpdate:
+            additionalProperties: false
+            properties:
+                class_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                member_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                schedule_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - member_id
+                - version
+                - reason
+            type: object
+        EventResult:
+            additionalProperties: false
+            properties:
+                awarded_on:
+                    format: date
+                    type:
+                        - string
+                        - "null"
+                comment:
+                    type: string
+                dog_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                entry_snapshot:
+                    anyOf:
+                        - $ref: '#/components/schemas/EventRegistration'
+                        - type: "null"
+                event_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                grade:
+                    anyOf:
+                        - $ref: '#/components/schemas/DogDictionary'
+                        - type: "null"
+                id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                is_void:
+                    type: boolean
+                legacy_judge_name:
+                    type:
+                        - string
+                        - "null"
+                place:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                recorded_by_profile_id:
+                    type:
+                        - string
+                        - "null"
+                registration_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - event_id
+                - registration_id
+                - dog_id
+                - awarded_on
+                - legacy_judge_name
+                - grade
+                - place
+                - comment
+                - recorded_by_profile_id
+                - entry_snapshot
+                - version
+                - is_void
+            type: object
+        EventResultCreate:
+            additionalProperties: false
+            anyOf:
+                - properties:
+                    grade_id:
+                        format: int32
+                        maximum: 2147483647
+                        minimum: 1
+                        type: integer
+                  required:
+                    - grade_id
+                - properties:
+                    place:
+                        format: int32
+                        maximum: 2147483647
+                        minimum: 1
+                        type: integer
+                  required:
+                    - place
+                - properties:
+                    comment:
+                        minLength: 1
+                        type: string
+                  required:
+                    - comment
+            properties:
+                comment:
+                    maxLength: 2000
+                    type: string
+                grade_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                place:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+            type: object
+        EventResultPage:
+            additionalProperties: false
+            properties:
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                records:
+                    items:
+                        $ref: '#/components/schemas/EventResult'
+                    type: array
+            required:
+                - records
+                - next_after
+            type: object
+        EventResultUpdate:
+            additionalProperties: false
+            anyOf:
+                - properties:
+                    grade_id:
+                        format: int32
+                        maximum: 2147483647
+                        minimum: 1
+                        type: integer
+                  required:
+                    - grade_id
+                - properties:
+                    place:
+                        format: int32
+                        maximum: 2147483647
+                        minimum: 1
+                        type: integer
+                  required:
+                    - place
+                - properties:
+                    comment:
+                        minLength: 1
+                        type: string
+                  required:
+                    - comment
+            properties:
+                comment:
+                    maxLength: 2000
+                    type: string
+                grade_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                place:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+            type: object
+        EventSchedule:
+            additionalProperties: false
+            properties:
+                class_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                enabled:
+                    type: boolean
+                ends_at:
+                    format: date-time
+                    type: string
+                event_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                name:
+                    maxLength: 150
+                    minLength: 1
+                    type: string
+                starts_at:
+                    format: date-time
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - event_id
+                - class_id
+                - name
+                - starts_at
+                - ends_at
+                - enabled
+                - version
+            type: object
+        EventScheduleCommand:
+            additionalProperties: false
+            properties:
+                class_id:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                enabled:
+                    type: boolean
+                ends_at:
+                    format: date-time
+                    type: string
+                name:
+                    maxLength: 150
+                    minLength: 1
+                    type: string
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                starts_at:
+                    format: date-time
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - name
+                - starts_at
+                - ends_at
+                - enabled
+                - version
+                - reason
+            type: object
+        EventStateInput:
+            additionalProperties: false
+            properties:
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                status:
+                    enum:
+                        - open
+                        - closed
+                        - in_progress
+                        - completed
+                        - cancelled
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+                - status
+            type: object
+        EventUpdate:
+            additionalProperties: false
+            properties:
+                audience:
+                    enum:
+                        - dogs
+                        - people
+                        - mixed
+                    type: string
+                description:
+                    maxLength: 4000
+                    type: string
+                ends_at:
+                    format: date-time
+                    type: string
+                name:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                starts_at:
+                    format: date-time
+                    type: string
+                timezone:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                type_id:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                uses_classes:
+                    type: boolean
+                venue_id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - name
+                - type_id
+                - venue_id
+                - starts_at
+                - ends_at
+                - timezone
+                - audience
+                - uses_classes
+                - version
+                - reason
+            type: object
+        EventVenue:
+            additionalProperties: false
+            properties:
+                building_number:
+                    maxLength: 20
+                    type: string
+                id:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                locality:
+                    maxLength: 100
+                    type: string
+                name:
+                    maxLength: 150
+                    type: string
+                room:
+                    maxLength: 20
+                    type: string
+                street:
+                    maxLength: 100
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - id
+                - name
+                - locality
+                - street
+                - building_number
+                - room
+                - version
+            type: object
+        EventVenueInput:
+            additionalProperties: false
+            properties:
+                building_number:
+                    maxLength: 20
+                    type: string
+                locality:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                name:
+                    maxLength: 150
+                    minLength: 1
+                    type: string
+                room:
+                    maxLength: 20
+                    type: string
+                street:
+                    maxLength: 100
+                    type: string
+            required:
+                - name
+                - locality
+            type: object
+        EventVenuePage:
+            additionalProperties: false
+            properties:
+                next_after:
+                    format: int64
+                    minimum: 1
+                    type:
+                        - integer
+                        - "null"
+                records:
+                    items:
+                        $ref: '#/components/schemas/EventVenue'
+                    type: array
+            required:
+                - records
+                - next_after
+            type: object
+        EventVenueUpdate:
+            additionalProperties: false
+            properties:
+                building_number:
+                    maxLength: 20
+                    type: string
+                locality:
+                    maxLength: 100
+                    minLength: 1
+                    type: string
+                name:
+                    maxLength: 150
+                    minLength: 1
+                    type: string
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                room:
+                    maxLength: 20
+                    type: string
+                street:
+                    maxLength: 100
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - name
+                - locality
+                - version
+                - reason
+            type: object
     securitySchemes:
         bearerAuth:
             bearerFormat: JWT
@@ -3365,9 +4620,9 @@ components:
             name: dogclub_refresh
             type: apiKey
 info:
-    description: 'Этапы 04–08: аккаунты и профили, члены клуба, собаки, ветеринарный и племенной учёт. Сотрудник оформляет заявки, эксперт решает, сотрудник фиксирует вязку и помёт. Медицинская проверка обеих собак на дату вязки; 365 дней между рождениями помётов с предварительной оценкой даты экспертом. Реальные нарушения сохраняются и отмечаются. Щенки регистрируются с идентификатором. Права профилей не объединяются. Версии, причины исправлений и атомарная история. JSON до 16 КиБ, RFC 9457.'
+    description: Этапы 04–09. Аккаунты и профили, члены клуба, собаки, ветеринария, племенной учёт и мероприятия. Сотрудник регистрирует участников; назначенный эксперт проверяет квалификацию и вводит результаты. Люди без собак, независимые площадки, классы, расписание, возраст на дату выступления и медицинский допуск на период участия. Версии, причины, история и снимки фактов. Строгий JSON, RFC 9457.
     title: Клуб собаководства — backend
-    version: 0.8.0
+    version: 0.9.0
 openapi: 3.1.1
 paths:
     /api/v1/breeding-requests:
@@ -8245,5 +9500,2149 @@ paths:
                         X-Request-ID:
                             $ref: '#/components/headers/RequestID'
             summary: Проверка соединения с PostgreSQL с коротким таймаутом
+    /api/v1/event-dictionaries:
+        get:
+            operationId: getEventDictionaries
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventDictionaries'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Типы мероприятий, названия классов, оценки; owner требует активного членства
+            tags:
+                - Events
+    /api/v1/event-experts:
+        get:
+            operationId: listEventExpertOptions
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventExpertOptions'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Включённые эксперты для назначения: staff/leader; без email и контактов'
+            tags:
+                - Events
+    /api/v1/event-venues:
+        get:
+            operationId: listEventVenues
+            parameters:
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 9223372036854776000
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventVenuePage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Площадки: staff/leader'
+            tags:
+                - Events
+        post:
+            operationId: createEventVenue
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventVenueInput'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventVenue'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Создать независимую площадку: staff'
+            tags:
+                - Events
+    /api/v1/event-venues/{venueID}:
+        get:
+            operationId: getEventVenue
+            parameters:
+                - in: path
+                  name: venueID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventVenue'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Площадка: staff/leader'
+            tags:
+                - Events
+        put:
+            operationId: correctEventVenue
+            parameters:
+                - in: path
+                  name: venueID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventVenueUpdate'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventVenue'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Исправить площадку до появления исторических фактов: staff'
+            tags:
+                - Events
+    /api/v1/event-venues/{venueID}/history:
+        get:
+            operationId: historyEventVenue
+            parameters:
+                - in: path
+                  name: venueID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 9223372036854776000
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventChangePage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'История площадки: staff/leader'
+            tags:
+                - Events
+    /api/v1/events:
+        get:
+            operationId: listEvents
+            parameters:
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: type_id
+                  schema:
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: status
+                  schema:
+                    enum:
+                        - draft
+                        - open
+                        - closed
+                        - in_progress
+                        - completed
+                        - cancelled
+                    type: string
+                - in: query
+                  name: q
+                  schema:
+                    maxLength: 100
+                    type: string
+                - in: query
+                  name: from
+                  schema:
+                    type: string
+                    format: date-time
+                - in: query
+                  name: to
+                  schema:
+                    type: string
+                    format: date-time
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Календарь: owner без черновиков, expert по назначениям'
+            tags:
+                - Events
+        post:
+            operationId: createEvent
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventInput'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Event'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Создать черновик: staff'
+            tags:
+                - Events
+    /api/v1/events/{eventID}:
+        get:
+            operationId: getEvent
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Event'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Мероприятие с классами и расписанием
+            tags:
+                - Events
+        put:
+            operationId: correctEvent
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventUpdate'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Event'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Исправить мероприятие до фактического участия: staff'
+            tags:
+                - Events
+    /api/v1/events/{eventID}/classes:
+        post:
+            operationId: createEventClass
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventClassCommand'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventClass'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Добавить classes: staff; версия мероприятия'
+            tags:
+                - Events
+    /api/v1/events/{eventID}/classes/{classID}:
+        get:
+            operationId: getEventClass
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: classID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventClass'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Запись classes этого мероприятия
+            tags:
+                - Events
+        put:
+            operationId: correctEventClass
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: classID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventClassCommand'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventClass'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Исправить classes с причиной: staff; версия записи'
+            tags:
+                - Events
+    /api/v1/events/{eventID}/experts:
+        put:
+            operationId: assignEventExperts
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventExpertsInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Event'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Назначить экспертов; без объединения прав профилей: staff'
+            tags:
+                - Events
+    /api/v1/events/{eventID}/history:
+        get:
+            operationId: historyEvent
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 9223372036854776000
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventChangePage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: История; owner только своя регистрация/результат без снимков
+            tags:
+                - Events
+    /api/v1/events/{eventID}/registrations:
+        get:
+            operationId: listEventRegistrations
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 9223372036854776000
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: dog_id
+                  schema:
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventRegistrationPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Участники; owner ограничен своим участием и текущими своими собаками
+            tags:
+                - Events
+        post:
+            operationId: registerEventParticipant
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventRegistrationInput'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventRegistration'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Записать человека или собаку: staff; допуск возвращается отдельно от факта регистрации'
+            tags:
+                - Events
+    /api/v1/events/{eventID}/registrations/{registrationID}:
+        get:
+            operationId: getEventRegistration
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: registrationID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventRegistration'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Регистрация с текущей проверкой и сохранённым снимком посещения
+            tags:
+                - Events
+        put:
+            operationId: correctEventRegistration
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: registrationID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventRegistrationUpdate'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventRegistration'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Исправить/возобновить регистрацию до участия: staff'
+            tags:
+                - Events
+    /api/v1/events/{eventID}/registrations/{registrationID}/attend:
+        post:
+            operationId: recordEventAttendance
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: registrationID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventCorrection'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventRegistration'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Зафиксировать участие с повторной проверкой: staff'
+            tags:
+                - Events
+    /api/v1/events/{eventID}/registrations/{registrationID}/cancel:
+        post:
+            operationId: cancelEventRegistration
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: registrationID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventCorrection'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventRegistration'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Отменить запись или исправить ошибочное посещение: staff'
+            tags:
+                - Events
+    /api/v1/events/{eventID}/registrations/{registrationID}/eligibility:
+        get:
+            description: Обе возрастные границы включены; календарные месяцы с ограничением концом месяца. Без расписания используется весь период мероприятия. Людям без собаки медицинская проверка не нужна.
+            operationId: checkEventEligibility
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: registrationID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventEligibility'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Возраст на локальную дату выступления, меддопуск на весь период, актуальность квалификации
+            tags:
+                - Events
+    /api/v1/events/{eventID}/registrations/{registrationID}/history:
+        get:
+            operationId: historyRegistration
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: registrationID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 9223372036854776000
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventChangePage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: История; owner только своя регистрация/результат без снимков
+            tags:
+                - Events
+    /api/v1/events/{eventID}/registrations/{registrationID}/qualify:
+        post:
+            operationId: qualifyEventParticipant
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: registrationID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventQualificationInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventRegistration'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Назначенный эксперт подтверждает квалификацию и документы
+            tags:
+                - Events
+    /api/v1/events/{eventID}/registrations/{registrationID}/result:
+        post:
+            operationId: createEventResult
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: registrationID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventResultCreate'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventResult'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Результат посещённого выступления: назначенный эксперт, версия регистрации'
+            tags:
+                - Events
+    /api/v1/events/{eventID}/results:
+        get:
+            operationId: listEventResults
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: dog_id
+                  schema:
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventResultPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Результаты; owner только текущих своих собак
+            tags:
+                - Events
+    /api/v1/events/{eventID}/results/{resultID}:
+        get:
+            operationId: getEventResult
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: resultID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventResult'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Результат; owner без исторического снимка участника
+            tags:
+                - Events
+        put:
+            operationId: correctEventResult
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: resultID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventResultUpdate'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventResult'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Исправить оценку/место с причиной: назначенный эксперт'
+            tags:
+                - Events
+    /api/v1/events/{eventID}/results/{resultID}/history:
+        get:
+            operationId: historyResult
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: resultID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 9223372036854776000
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventChangePage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: История; owner только своя регистрация/результат без снимков
+            tags:
+                - Events
+    /api/v1/events/{eventID}/results/{resultID}/void:
+        post:
+            operationId: voidEventResult
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: resultID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventCorrection'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventResult'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Отметить ошибочный результат; история сохраняется
+            tags:
+                - Events
+    /api/v1/events/{eventID}/schedule:
+        post:
+            operationId: createEventSchedule
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventScheduleCommand'
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventSchedule'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Location:
+                            required: true
+                            schema:
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Добавить schedule: staff; версия мероприятия'
+            tags:
+                - Events
+    /api/v1/events/{eventID}/schedule/{scheduleID}:
+        get:
+            operationId: getEventSchedule
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: scheduleID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventSchedule'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: Запись schedule этого мероприятия
+            tags:
+                - Events
+        put:
+            operationId: correctEventSchedule
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+                - in: path
+                  name: scheduleID
+                  required: true
+                  schema:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventScheduleCommand'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/EventSchedule'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Исправить schedule с причиной: staff; версия записи'
+            tags:
+                - Events
+    /api/v1/events/{eventID}/state:
+        post:
+            operationId: changeEventState
+            parameters:
+                - in: path
+                  name: eventID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/EventStateInput'
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Event'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Изменить состояние по допустимому переходу: staff'
+            tags:
+                - Events
+    /api/v1/events/dogs:
+        get:
+            operationId: listEventDogs
+            parameters:
+                - in: query
+                  name: after
+                  schema:
+                    default: 0
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: limit
+                  schema:
+                    default: 50
+                    format: int64
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                - in: query
+                  name: breed_id
+                  schema:
+                    format: int64
+                    maximum: 2147483647
+                    minimum: 0
+                    type: integer
+                - in: query
+                  name: q
+                  schema:
+                    maxLength: 100
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DogPage'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/EventConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/EventsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Поиск собак для записи: staff/leader'
+            tags:
+                - Events
 servers:
     - url: http://127.0.0.1:8080

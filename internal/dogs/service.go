@@ -19,6 +19,7 @@ type Service struct {
 	members  *members.Service
 	dates    MedicalDatesPolicy
 	breeding BreedingPolicy
+	events   EventPolicy
 	now      func() time.Time
 }
 
@@ -252,6 +253,15 @@ func (s *Service) mutate(ctx context.Context, p auth.Principal, id int32, versio
 			}
 			if !ok {
 				return invalid("fields", "Изменение противоречит зарегистрированной вязке или помёту.")
+			}
+		}
+		if s.events != nil {
+			ok, e := s.events.Consistent(ctx, tx, before, result)
+			if e != nil {
+				return ErrUnavailable
+			}
+			if !ok {
+				return invalid("date_of_birth", "Дата рождения противоречит зарегистрированному участию в мероприятии.")
 			}
 		}
 		return q.record(ctx, current, action, reason, &before, result)

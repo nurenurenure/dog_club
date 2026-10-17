@@ -11,6 +11,7 @@ import (
 	"dogclub.local/backend/internal/auth"
 	"dogclub.local/backend/internal/breeding"
 	"dogclub.local/backend/internal/dogs"
+	"dogclub.local/backend/internal/events"
 	"dogclub.local/backend/internal/members"
 	"dogclub.local/backend/internal/veterinary"
 
@@ -31,7 +32,7 @@ func TestRoutesAndResponsesMatchOpenAPI(t *testing.T) {
 			return errors.New("private_database_error")
 		}
 		return nil
-	}, func() {}, auth.NewHandler(nil, false), members.NewHandler(nil, auth.NewHandler(nil, false)), dogs.NewHandler(nil, auth.NewHandler(nil, false)), veterinary.NewHandler(nil, auth.NewHandler(nil, false)), breeding.NewHandler(nil, auth.NewHandler(nil, false)))
+	}, func() {}, auth.NewHandler(nil, false), members.NewHandler(nil, auth.NewHandler(nil, false)), dogs.NewHandler(nil, auth.NewHandler(nil, false)), veterinary.NewHandler(nil, auth.NewHandler(nil, false)), breeding.NewHandler(nil, auth.NewHandler(nil, false)), events.NewHandler(nil, auth.NewHandler(nil, false)))
 	mux := a.server.Handler.(*chi.Mux)
 	var routes int
 	if err := chi.Walk(mux, func(method, path string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {

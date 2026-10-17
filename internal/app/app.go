@@ -11,6 +11,7 @@ import (
 	"dogclub.local/backend/internal/auth"
 	"dogclub.local/backend/internal/breeding"
 	"dogclub.local/backend/internal/dogs"
+	"dogclub.local/backend/internal/events"
 	"dogclub.local/backend/internal/health"
 	"dogclub.local/backend/internal/members"
 	"dogclub.local/backend/internal/platform/config"
@@ -52,8 +53,10 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	vetService := veterinary.NewService(service, dogService, memberService)
 	dogService.SetBreedingPolicy(breeding.DogPolicy{})
 	breedingService := breeding.NewService(service, dogService, vetService)
+	dogService.SetEventPolicy(events.DogPolicy{})
+	eventService := events.NewService(service, memberService, dogService, vetService)
 	return newApp(cfg, logger, pool.Ping, pool.Close, authHandler,
-		members.NewHandler(memberService, authHandler), dogs.NewHandler(dogService, authHandler), veterinary.NewHandler(vetService, authHandler), breeding.NewHandler(breedingService, authHandler)), nil
+		members.NewHandler(memberService, authHandler), dogs.NewHandler(dogService, authHandler), veterinary.NewHandler(vetService, authHandler), breeding.NewHandler(breedingService, authHandler), events.NewHandler(eventService, authHandler)), nil
 }
 
 func newApp(cfg config.Config, logger *slog.Logger, ping func(context.Context) error, closePool func(), apiHandlers ...interface{ RegisterRoutes(chi.Router) }) *App {

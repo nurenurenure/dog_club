@@ -32,7 +32,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if err := Run(ctx, "status", url, &output); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(output.String(), "pending") != 7 || scalar(t, ctx, conn,
+	if strings.Count(output.String(), "pending") != 8 || scalar(t, ctx, conn,
 		`SELECT count(*) FROM pg_tables WHERE schemaname='public'`) != 0 {
 		t.Fatal("status on an empty database must list pending migrations without creating tables")
 	}
@@ -46,19 +46,19 @@ func TestPostgresMigrations(t *testing.T) {
 			t.Fatalf("unexpected migration result: %q", output.String())
 		}
 	}
-	apply("applied 7 migration(s)\n")
-	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 51 {
-		t.Fatalf("expected 50 application tables and Goose history, got %d", count)
+	apply("applied 8 migration(s)\n")
+	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 57 {
+		t.Fatalf("expected 56 application tables and Goose history, got %d", count)
 	}
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_constraint c JOIN pg_namespace n
-		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 80 {
-		t.Fatalf("expected 69 previous and 11 breeding FK, got %d", count)
+		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 99 {
+		t.Fatalf("expected 80 previous and 19 event FK, got %d", count)
 	}
 	checkSeeds(t, ctx, conn)
 	apply("applied 0 migration(s)\n")
 	output.Reset()
-	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 7 {
-		t.Fatalf("expected seven applied versions: %v %q", err, output.String())
+	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 8 {
+		t.Fatalf("expected eight applied versions: %v %q", err, output.String())
 	}
 
 	t.Run("constraints and deletion policies", func(t *testing.T) {
@@ -168,7 +168,7 @@ func TestPostgresMigrations(t *testing.T) {
 		checkSeeds(t, ctx, conn)
 	})
 
-	for range 7 {
+	for range 8 {
 		if err := Run(ctx, "down", url, io.Discard); err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 1 {
 		t.Fatalf("full rollback must leave only Goose history, got %d tables", count)
 	}
-	apply("applied 7 migration(s)\n")
+	apply("applied 8 migration(s)\n")
 	checkSeeds(t, ctx, conn)
 }
 
@@ -360,11 +360,74 @@ func TestBreedingUpgradePreservesLegacyFactsAndRefusesAmbiguousIDs(t *testing.T)
 	if _, err := conn.Exec(ctx, `INSERT INTO breeding_request(female_dog_id,male_dog_id,planned_date) VALUES(401,402,'2025-01-01')`); err != nil {
 		t.Fatal(err)
 	}
+	rollbackTo(t, ctx, url, 7)
 	if err := Run(ctx, "down", url, io.Discard); err == nil {
 		t.Fatal("rollback removed new breeding information")
 	}
 	if scalar(t, ctx, conn, `SELECT count(*) FROM breeding_request`) != 1 {
 		t.Fatal("failed rollback lost request")
+	}
+}
+
+func TestEventsUpgradePreservesDatesAddressesAndResults(t *testing.T) {
+	ctx, url, conn := testDatabase(t)
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	rollbackTo(t, ctx, url, 7)
+	_, err := conn.Exec(ctx, `INSERT INTO club_member(club_member_id,club_member_full_name,membership_status_id) VALUES(501,'Legacy event participant',1);
+    INSERT INTO address(address_id,club_member_id,address_type_id,address_locality,address_street,address_building_number,address_apartment_number) VALUES(501,501,1,'Legacy locality','Legacy street','12','3');
+    INSERT INTO dog(dog_id,dog_nickname,dog_date_of_birth,dog_identifier_number,dog_status_id,identifier_type_id,dog_breed_id,coat_color_id,sex_id) VALUES
+    (501,'Legacy attendee','2020-01-01','EVENT-501',1,1,1,1,1),(502,'Legacy other','2020-01-01','EVENT-502',1,1,1,1,1);
+    INSERT INTO event(event_id,event_name,event_start_date,event_end_date,address_id,event_type_id,event_class_id) VALUES(501,'Legacy show','2024-01-01 12:34:56.123456','2024-01-02 15:16:17.123456',501,1,3);
+    INSERT INTO achievement(achievement_id,event_id,dog_id,achievement_award_date,achievement_judge_full_name,grade_id) VALUES(501,501,501,'2024-01-02','Legacy judge',1),(501,501,502,'2024-01-02','Other judge',2);`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "up", url, io.Discard); err == nil || !strings.Contains(err.Error(), "23505") {
+		t.Fatal("upgrade accepted ambiguous achievement IDs")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM achievement`) != 2 || scalar(t, ctx, conn, `SELECT count(*) FROM information_schema.tables WHERE table_name='event_venue'`) != 0 {
+		t.Fatal("failed upgrade changed source data")
+	}
+	if _, err := conn.Exec(ctx, `DELETE FROM achievement WHERE dog_id=502`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	checks := []string{
+		`SELECT count(*) FROM event WHERE event_id=501 AND event_start_date='2024-01-01 12:34:56.123456' AND event_end_date='2024-01-02 15:16:17.123456' AND address_id=501 AND event_class_id=3 AND starts_at IS NULL AND ends_at IS NULL AND timezone IS NULL AND audience IS NULL AND status='draft' AND version=1 AND rules_version=1`,
+		`SELECT count(*) FROM event_venue WHERE legacy_address_id=501 AND locality='Legacy locality' AND street='Legacy street' AND building_number='12' AND room='3'`,
+		`SELECT count(*) FROM event_class_rule WHERE event_id=501 AND catalog_class_id=3 AND min_age_months IS NULL AND max_age_months IS NULL AND NOT requires_expert`,
+		`SELECT count(*) FROM achievement WHERE achievement_id=501 AND dog_id=501 AND achievement_award_date='2024-01-02' AND achievement_judge_full_name='Legacy judge' AND grade_id=1 AND registration_id IS NULL AND recorded_by_profile_id IS NULL AND entry_snapshot IS NULL`,
+		`SELECT count(*) FROM address WHERE address_id=501 AND club_member_id=501 AND address_locality='Legacy locality'`,
+	}
+	for _, query := range checks {
+		if scalar(t, ctx, conn, query) != 1 {
+			t.Fatal("upgrade invented timezone, age, judge account or changed old facts")
+		}
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM event_registration`) != 0 || scalar(t, ctx, conn, `SELECT count(*) FROM event_changes`) != 0 {
+		t.Fatal("upgrade invented participation/history")
+	}
+	if err := Run(ctx, "down", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM achievement WHERE achievement_id=501 AND achievement_judge_full_name='Legacy judge' AND grade_id=1`) != 1 {
+		t.Fatal("rollback changed old result")
+	}
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `INSERT INTO event_venue(name,locality) VALUES('New venue','New locality')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "down", url, io.Discard); err == nil {
+		t.Fatal("rollback discarded a new venue")
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM event_venue`) != 2 {
+		t.Fatal("failed rollback lost data")
 	}
 }
 
