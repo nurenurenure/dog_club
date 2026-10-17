@@ -1,8 +1,8 @@
-# Локальная эксплуатация backend (этап 12)
+# Локальная эксплуатация backend
 
-React разрабатывается отдельным этапом. Здесь только Go API, PostgreSQL 18 и
-Mailpit. Развёртывание на публичном сервере, внешний SMTP, TLS, Prometheus/Grafana,
-ELK, Telegram, REST-ящик уведомлений и WebSocket в этот этап не входят.
+Репозиторий содержит Go API, PostgreSQL 18 и Mailpit. React-клиент не включён.
+Развёртывание на публичном сервере, внешний SMTP, TLS, Prometheus/Grafana,
+ELK, Telegram, REST-ящик уведомлений и WebSocket не настроены.
 
 ## Первый запуск и обычная работа
 
