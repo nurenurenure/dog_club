@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+!.env.example
+var
+bin
+tmp
+*.log
+*.pdf
+.DS_Store

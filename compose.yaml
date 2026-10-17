@@ -1,6 +1,62 @@
 name: dogclub
 
+x-app: &app
+  image: ${DOGCLUB_IMAGE:-dogclub-backend:local}
+  build:
+    context: .
+    target: runtime
+  environment:
+    DATABASE_URL: postgres://${POSTGRES_USER:-dogclub}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-dogclub}?sslmode=disable
+    AUTH_JWT_KEY: ${AUTH_JWT_KEY:?Set AUTH_JWT_KEY in .env}
+    AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:-dogclub.local}
+    AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE:-dogclub-api}
+    AUTH_COOKIE_SECURE: "false"
+    LOCAL_COMPOSE: "true"
+    HTTP_ADDR: 0.0.0.0:8080
+    SMTP_ADDR: mailpit:1025
+    MAIL_FROM: ${MAIL_FROM:-noreply@dogclub.test}
+    DOCUMENTS_DIR: /data/documents
+    NOTIFICATIONS_ENABLED: ${NOTIFICATIONS_ENABLED:-true}
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+  volumes:
+    - documents_data:/data/documents
+
 services:
+  migrate:
+    <<: *app
+    entrypoint: [/bin/sh, -ec]
+    command: ["/migrate up && /maintenance"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+  api:
+    <<: *app
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+    stop_grace_period: 30s
+    healthcheck:
+      test: [CMD, /healthcheck]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: "no"
+  checks:
+    profiles: [tools]
+    build:
+      context: .
+      target: sdk
+    environment:
+      DOGCLUB_TEST_DATABASE_URL: postgres://${POSTGRES_USER:-dogclub}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-dogclub}?sslmode=disable
+    command: [sh, -ec, "go mod verify && go vet ./... && go build ./... && go test -race -tags=integration ./..."]
+    depends_on:
+      db:
+        condition: service_healthy
   mailpit:
     image: axllent/mailpit:v1.31.6
     ports:
@@ -27,3 +83,4 @@ services:
 
 volumes:
   postgres_data:
+  documents_data:
