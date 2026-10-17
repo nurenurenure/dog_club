@@ -28,6 +28,16 @@ func NewLocalSMTP(address, from string) (*LocalSMTP, error) {
 }
 
 func (m *LocalSMTP) Send(ctx context.Context, to, subject, body string) error {
+	return m.send(ctx, to, subject, body, "")
+}
+
+func (m *LocalSMTP) SendNotification(ctx context.Context, to, subject, body, messageID string) error {
+	if len(messageID) < 3 || !strings.HasPrefix(messageID, "<") || !strings.HasSuffix(messageID, ">") || strings.ContainsAny(messageID, "\r\n") {
+		return fmt.Errorf("invalid message ID")
+	}
+	return m.send(ctx, to, subject, body, messageID)
+}
+func (m *LocalSMTP) send(ctx context.Context, to, subject, body, messageID string) error {
 	a, err := netmail.ParseAddress(to)
 	if err != nil || a.Address != to || strings.ContainsAny(to, "\r\n") || strings.ContainsAny(subject, "\r\n") {
 		return fmt.Errorf("invalid mail envelope")
@@ -61,7 +71,11 @@ func (m *LocalSMTP) Send(ctx context.Context, to, subject, body string) error {
 	if err != nil {
 		return fmt.Errorf("local SMTP rejected message")
 	}
-	_, err = fmt.Fprintf(w, "From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s", m.From, to, mime.QEncoding.Encode("UTF-8", subject), strings.ReplaceAll(body, "\n", "\r\n"))
+	header := ""
+	if messageID != "" {
+		header = "Message-ID: " + messageID + "\r\n"
+	}
+	_, err = fmt.Fprintf(w, header+"From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n%s", m.From, to, mime.QEncoding.Encode("UTF-8", subject), strings.ReplaceAll(body, "\n", "\r\n"))
 	if err != nil {
 		_ = w.Close()
 		return fmt.Errorf("local SMTP delivery failed")

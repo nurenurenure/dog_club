@@ -11,16 +11,18 @@ import (
 
 	"dogclub.local/backend/internal/auth"
 	"dogclub.local/backend/internal/members"
+	"dogclub.local/backend/internal/platform/notify"
 	"github.com/jackc/pgx/v5"
 )
 
 type Service struct {
-	access   *auth.Service
-	members  *members.Service
-	dates    MedicalDatesPolicy
-	breeding BreedingPolicy
-	events   EventPolicy
-	now      func() time.Time
+	notifications notify.Sink
+	access        *auth.Service
+	members       *members.Service
+	dates         MedicalDatesPolicy
+	breeding      BreedingPolicy
+	events        EventPolicy
+	now           func() time.Time
 }
 
 // MedicalDatesPolicy is supplied by the veterinary module at composition time.
@@ -169,6 +171,7 @@ func (s *Service) readAccess(ctx context.Context, tx pgx.Tx, p auth.Principal, i
 func (s *Service) Get(ctx context.Context, p auth.Principal, id int32) (Dog, error) {
 	var result Dog
 	err := s.access.WithAccess(ctx, p, []string{"staff", "leader", "owner"}, func(ctx context.Context, tx pgx.Tx, current auth.Principal) error {
+		ctx = notify.WithSink(ctx, s.notifications)
 		if err := s.readAccess(ctx, tx, current, id); err != nil {
 			return err
 		}
@@ -185,6 +188,7 @@ func (s *Service) List(ctx context.Context, p auth.Principal, f Filter) (Page, e
 	}
 	var result Page
 	err := s.access.WithAccess(ctx, p, []string{"staff", "leader", "owner"}, func(ctx context.Context, tx pgx.Tx, current auth.Principal) error {
+		ctx = notify.WithSink(ctx, s.notifications)
 		memberID, err := s.owner(ctx, tx, current)
 		if err != nil {
 			return err
@@ -206,6 +210,7 @@ func (s *Service) Create(ctx context.Context, p auth.Principal, in CreateInput) 
 	}
 	var result Dog
 	err := s.access.WithAccess(ctx, p, []string{"staff"}, func(ctx context.Context, tx pgx.Tx, current auth.Principal) error {
+		ctx = notify.WithSink(ctx, s.notifications)
 		if err := s.validateOwnerReferences(ctx, tx, in.OwnerIDs); err != nil {
 			return err
 		}
@@ -231,6 +236,7 @@ func (s *Service) mutate(ctx context.Context, p auth.Principal, id int32, versio
 	}
 	var result Dog
 	err := s.access.WithAccess(ctx, p, []string{"staff"}, func(ctx context.Context, tx pgx.Tx, current auth.Principal) error {
+		ctx = notify.WithSink(ctx, s.notifications)
 		q := &repository{tx}
 		before, err := q.card(ctx, id)
 		if err != nil {
@@ -482,6 +488,7 @@ func (s *Service) History(ctx context.Context, p auth.Principal, id int32, after
 	}
 	var result HistoryPage
 	err := s.access.WithAccess(ctx, p, []string{"staff", "leader", "owner"}, func(ctx context.Context, tx pgx.Tx, current auth.Principal) error {
+		ctx = notify.WithSink(ctx, s.notifications)
 		if err := s.readAccess(ctx, tx, current, id); err != nil {
 			return err
 		}
@@ -498,6 +505,7 @@ func (s *Service) History(ctx context.Context, p auth.Principal, id int32, after
 func (s *Service) Dictionaries(ctx context.Context, p auth.Principal) (Dictionaries, error) {
 	var result Dictionaries
 	err := s.access.WithAccess(ctx, p, []string{"staff", "leader", "owner"}, func(ctx context.Context, tx pgx.Tx, current auth.Principal) error {
+		ctx = notify.WithSink(ctx, s.notifications)
 		if _, err := s.owner(ctx, tx, current); err != nil {
 			return err
 		}
@@ -507,3 +515,5 @@ func (s *Service) Dictionaries(ctx context.Context, p auth.Principal) (Dictionar
 	})
 	return result, err
 }
+
+func (s *Service) SetNotificationSink(sink notify.Sink) { s.notifications = sink }

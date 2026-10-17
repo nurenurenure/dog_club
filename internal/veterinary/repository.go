@@ -156,6 +156,10 @@ func (q *repository) vaccination(ctx context.Context, dogID, id int32) (Vaccinat
 		out.Vaccine.Validity = nil
 		out.Vaccine.Revaccination = nil
 	}
+	if err != nil {
+		return out, err
+	}
+	out.ReplacesVaccinationIDs, err = q.reminderReplacements(ctx, dogID, id)
 	return out, err
 }
 func (q *repository) saveVaccination(ctx context.Context, p auth.Principal, dogID, id int32, version int64, in VaccinationInput, vaccine VaccineType, until, next string) (int32, error) {

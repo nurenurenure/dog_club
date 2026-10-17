@@ -254,3 +254,37 @@ func testClient(t *testing.T, listener *memoryListener) *http.Client {
 	t.Cleanup(transport.CloseIdleConnections)
 	return &http.Client{Transport: transport, Timeout: 3 * time.Second}
 }
+
+func TestShutdownJoinsNotificationWorkerBeforePoolClose(t *testing.T) {
+	started := make(chan struct{})
+	var stopped, closed atomic.Bool
+	a := newApp(testConfig(), testLogger(), func(context.Context) error { return nil }, func() {
+		if !stopped.Load() {
+			t.Error("pool closed before notification worker")
+		}
+		closed.Store(true)
+	})
+	a.worker = func(ctx context.Context, _ *slog.Logger) { close(started); <-ctx.Done(); stopped.Store(true) }
+	listener := testListener(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- a.serve(ctx, listener) }()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("worker did not start")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("shutdown did not join worker")
+	}
+	if !closed.Load() {
+		t.Fatal("pool not closed")
+	}
+}

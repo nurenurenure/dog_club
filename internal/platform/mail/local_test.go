@@ -1,6 +1,9 @@
 package mail
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestLocalSMTPRejectsExternalEndpointsAndHeaderInjection(t *testing.T) {
 	for _, test := range []struct{ addr, from string }{
@@ -13,5 +16,15 @@ func TestLocalSMTPRejectsExternalEndpointsAndHeaderInjection(t *testing.T) {
 	}
 	if _, err := NewLocalSMTP("127.0.0.1:1025", "club@dogclub.test"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestNotificationRejectsInjectedMessageIDBeforeConnecting(t *testing.T) {
+	m, err := NewLocalSMTP("127.0.0.1:1", "club@dogclub.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = m.SendNotification(context.Background(), "owner@dogclub.test", "Subject", "Body", "<id@dogclub.local>\r\nBcc: other@dogclub.test"); err == nil {
+		t.Fatal("message ID header injection accepted")
 	}
 }

@@ -352,8 +352,14 @@ func (s *Service) CreateVaccination(ctx context.Context, p auth.Principal, dogID
 		if err != nil {
 			return Vaccination{}, err
 		}
+		if err := q.validateReminderReplacements(ctx, dogID, 0, in); err != nil {
+			return Vaccination{}, err
+		}
 		id, err := q.saveVaccination(ctx, current, dogID, 0, 0, in, vaccine, until, next)
 		if err != nil {
+			return Vaccination{}, err
+		}
+		if err := q.saveReminderReplacements(ctx, dogID, id, in.ReplacesVaccinationIDs); err != nil {
 			return Vaccination{}, err
 		}
 		out, err := q.vaccination(ctx, dogID, id)
@@ -412,7 +418,16 @@ func (s *Service) UpdateVaccination(ctx context.Context, p auth.Principal, dogID
 		if until == nil || next == nil {
 			return Vaccination{}, invalid("fields", "Для пересчёта укажите дату и настроенный препарат.")
 		}
+		if in.ReplacesVaccinationIDs == nil {
+			in.ReplacesVaccinationIDs = before.ReplacesVaccinationIDs
+		}
+		if err := q.validateReminderReplacements(ctx, dogID, id, in.VaccinationInput); err != nil {
+			return Vaccination{}, err
+		}
 		if _, err := q.saveVaccination(ctx, current, dogID, id, in.Version, in.VaccinationInput, vaccine, *until, *next); err != nil {
+			return Vaccination{}, err
+		}
+		if err := q.saveReminderReplacements(ctx, dogID, id, in.ReplacesVaccinationIDs); err != nil {
 			return Vaccination{}, err
 		}
 		out, err := q.vaccination(ctx, dogID, id)

@@ -64,7 +64,13 @@ func (s *Service) check(ctx context.Context, q *repository, a scope, e Event, r 
 	}
 	dog := r.Dog
 	if dog == nil {
-		v, err := s.dogs.ReadForEvents(ctx, q.tx, a.p, *r.DogID)
+		var v dogs.EventAnimal
+		var err error
+		if a.background {
+			v, err = s.dogs.NotificationAnimal(ctx, q.tx, *r.DogID)
+		} else {
+			v, err = s.dogs.ReadForEvents(ctx, q.tx, a.p, *r.DogID)
+		}
 		if err != nil {
 			return out, err
 		}
@@ -74,7 +80,12 @@ func (s *Service) check(ctx context.Context, q *repository, a scope, e Event, r 
 	if dog.Identifier.Number == "" {
 		out.BlockingReasons = append(out.BlockingReasons, "identifier_missing")
 	}
-	if err = s.dogs.ValidateEventRepresentative(ctx, q.tx, a.p, *r.DogID, r.MemberID); errors.Is(err, dogs.ErrNotFound) {
+	if a.background {
+		err = s.dogs.NotificationRepresentative(ctx, q.tx, *r.DogID, r.MemberID)
+	} else {
+		err = s.dogs.ValidateEventRepresentative(ctx, q.tx, a.p, *r.DogID, r.MemberID)
+	}
+	if errors.Is(err, dogs.ErrNotFound) {
 		out.BlockingReasons = append(out.BlockingReasons, "representative_not_owner")
 	} else if err != nil {
 		return out, err
@@ -99,7 +110,7 @@ func (s *Service) check(ctx context.Context, q *repository, a scope, e Event, r 
 	if !allowed {
 		out.BlockingReasons = append(out.BlockingReasons, "age_not_allowed")
 	}
-	medical, err := s.vet.CheckForEvents(ctx, q.tx, a.p, *r.DogID, medicalStart, medicalEnd)
+	medical, err := s.admissionForNotification(ctx, q, a, r, medicalStart, medicalEnd)
 	if err != nil {
 		return out, err
 	}
@@ -115,7 +126,7 @@ func (s *Service) check(ctx context.Context, q *repository, a scope, e Event, r 
 			if err != nil {
 				return out, err
 			}
-			active, err := s.access.EventExpertActive(ctx, q.tx, a.p, *r.QualifierProfileID)
+			active, err := s.expertForNotification(ctx, q, a, *r.QualifierProfileID)
 			if err != nil {
 				return out, err
 			}

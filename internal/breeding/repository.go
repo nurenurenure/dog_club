@@ -260,7 +260,10 @@ func (q *repository) record(ctx context.Context, p auth.Principal, entity string
 		return ErrUnavailable
 	}
 	_, err = q.tx.Exec(ctx, `INSERT INTO breeding_changes(entity,entity_id,actor_user_id,actor_profile_id,action,reason,before_data,after_data,request_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, entity, id, p.User.ID, p.Profile.ID, action, reason, old, json.RawMessage(next), auth.RequestID(ctx))
-	return storageError(err)
+	if err != nil {
+		return storageError(err)
+	}
+	return q.notification(ctx, entity, action, before, after)
 }
 func (q *repository) history(ctx context.Context, entity string, id int64, f Filter) (Page[Change], error) {
 	out := Page[Change]{Records: []Change{}}

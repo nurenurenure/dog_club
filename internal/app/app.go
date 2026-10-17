@@ -15,12 +15,14 @@ import (
 	"dogclub.local/backend/internal/events"
 	"dogclub.local/backend/internal/health"
 	"dogclub.local/backend/internal/members"
+	"dogclub.local/backend/internal/notifications"
 	"dogclub.local/backend/internal/platform/config"
 	"dogclub.local/backend/internal/platform/database"
 	"dogclub.local/backend/internal/platform/filestore"
 	"dogclub.local/backend/internal/platform/httpapi"
 	"dogclub.local/backend/internal/platform/mail"
 	"dogclub.local/backend/internal/platform/middleware"
+	"dogclub.local/backend/internal/platform/notify"
 	"dogclub.local/backend/internal/reports"
 	"dogclub.local/backend/internal/veterinary"
 	"github.com/go-chi/chi/v5"
@@ -32,6 +34,7 @@ type App struct {
 	logger    *slog.Logger
 	server    *http.Server
 	health    *health.Handler
+	worker    func(context.Context, *slog.Logger)
 	closePool func()
 }
 
@@ -65,8 +68,15 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	}
 	reportService := reports.NewService(service, memberService, dogService, breedingService, eventService)
 	documentService := documents.NewService(service, memberService, dogService, vetService, files, breedingService, eventService)
-	return newApp(cfg, logger, pool.Ping, func() { _ = files.Close(); pool.Close() }, authHandler,
-		members.NewHandler(memberService, authHandler), dogs.NewHandler(dogService, authHandler), veterinary.NewHandler(vetService, authHandler), breeding.NewHandler(breedingService, authHandler), events.NewHandler(eventService, authHandler), documents.NewHandler(documentService, authHandler), reports.NewHandler(reportService, authHandler)), nil
+	notifier := notifications.New(pool, service, memberService, dogService, mailer, map[string]notify.Provider{"dogs": dogService, "veterinary": vetService, "breeding": breedingService, "events": eventService, "documents": documentService})
+	dogService.SetNotificationSink(notifier)
+	breedingService.SetNotificationSink(notifier)
+	eventService.SetNotificationSink(notifier)
+	documentService.SetNotificationSink(notifier)
+	application := newApp(cfg, logger, pool.Ping, func() { _ = files.Close(); pool.Close() }, authHandler,
+		members.NewHandler(memberService, authHandler), dogs.NewHandler(dogService, authHandler), veterinary.NewHandler(vetService, authHandler), breeding.NewHandler(breedingService, authHandler), events.NewHandler(eventService, authHandler), documents.NewHandler(documentService, authHandler), reports.NewHandler(reportService, authHandler))
+	application.worker = notifier.Run
+	return application, nil
 }
 
 func newApp(cfg config.Config, logger *slog.Logger, ping func(context.Context) error, closePool func(), apiHandlers ...interface{ RegisterRoutes(chi.Router) }) *App {
@@ -111,6 +121,14 @@ func (a *App) Run(ctx context.Context) error {
 
 func (a *App) serve(ctx context.Context, listener net.Listener) error {
 	defer a.closePool()
+	workerCtx, stopWorker := context.WithCancel(context.Background())
+	workerDone := make(chan struct{})
+	if a.worker != nil {
+		go func() { defer close(workerDone); a.worker(workerCtx, a.logger) }()
+	} else {
+		close(workerDone)
+	}
+	defer func() { stopWorker(); <-workerDone }()
 	// Shutdown must let in-flight requests finish before canceling their context.
 	requestContext, cancelRequests := context.WithCancel(context.Background())
 	defer cancelRequests()

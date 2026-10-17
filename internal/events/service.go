@@ -10,29 +10,32 @@ import (
 	"dogclub.local/backend/internal/auth"
 	"dogclub.local/backend/internal/dogs"
 	"dogclub.local/backend/internal/members"
+	"dogclub.local/backend/internal/platform/notify"
 	"dogclub.local/backend/internal/veterinary"
 
 	"github.com/jackc/pgx/v5"
 )
 
 type Service struct {
-	access  *auth.Service
-	members *members.Service
-	dogs    *dogs.Service
-	vet     *veterinary.Service
-	now     func() time.Time
+	notifications notify.Sink
+	access        *auth.Service
+	members       *members.Service
+	dogs          *dogs.Service
+	vet           *veterinary.Service
+	now           func() time.Time
 }
 
 func NewService(a *auth.Service, m *members.Service, d *dogs.Service, v *veterinary.Service) *Service {
-	return &Service{a, m, d, v, time.Now}
+	return &Service{access: a, members: m, dogs: d, vet: v, now: time.Now}
 }
 
 var readRoles = []string{"staff", "expert", "leader", "owner"}
 
 type scope struct {
-	p        auth.Principal
-	memberID int32
-	dogIDs   []int32
+	background bool
+	p          auth.Principal
+	memberID   int32
+	dogIDs     []int32
 }
 
 func domainError(err error) error {
@@ -74,6 +77,7 @@ func domainError(err error) error {
 func with[T any](ctx context.Context, s *Service, p auth.Principal, roles []string, fn func(context.Context, *repository, scope) (T, error)) (T, error) {
 	var out T
 	err := s.access.WithAccess(ctx, p, roles, func(ctx context.Context, tx pgx.Tx, p auth.Principal) error {
+		ctx = notify.WithSink(ctx, s.notifications)
 		access := scope{p: p, dogIDs: []int32{}}
 		if p.Profile.Role == "owner" {
 			var err error
@@ -585,3 +589,5 @@ func (s *Service) SaveSchedule(ctx context.Context, p auth.Principal, eventID in
 		return *out, q.record(ctx, a.p, &eventID, "schedule", id, "saved", in.Reason, before, *out)
 	})
 }
+
+func (s *Service) SetNotificationSink(sink notify.Sink) { s.notifications = sink }

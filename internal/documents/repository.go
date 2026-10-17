@@ -101,7 +101,10 @@ func (q *repository) record(ctx context.Context, p auth.Principal, d Document, a
 		return ErrUnavailable
 	}
 	_, err = q.tx.Exec(ctx, `INSERT INTO document_changes(document_id,actor_user_id,actor_profile_id,action,reason,before_data,after_data,request_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, d.ID, p.User.ID, p.Profile.ID, action, reason, old, next, auth.RequestID(ctx))
-	return storageError(err)
+	if err != nil {
+		return storageError(err)
+	}
+	return q.notification(ctx, d, action)
 }
 func (q *repository) list(ctx context.Context, f Filter, owner *int32, dogs []int32, vet, expert bool, assigned []int32) ([]int32, error) {
 	rows, err := q.tx.Query(ctx, `SELECT document_id FROM document WHERE document_id>$1 AND ($2::integer=0 OR document_type_id=$2) AND ($3::integer=0 OR dog_id=$3) AND ($4::integer=0 OR subject_member_id=$4 OR recipient_member_id=$4) AND ($5::text='' OR position(lower($5) IN lower(COALESCE(document_number,'')))>0) AND ($6::date IS NULL OR document_issue_date>=$6) AND ($7::date IS NULL OR document_issue_date<=$7) AND ($8::integer IS NULL OR (status<>'legacy' AND (subject_member_id=$8 OR (dog_id=ANY($9::integer[]) AND recipient_member_id=$8)))) AND (NOT $10 OR category='medical' OR (status='legacy' AND document_type_id IN (SELECT document_type_id FROM document_type WHERE document_type_name IN ('Ветеринарный паспорт','Ветеринарная справка','Документ о результатах обследования')))) AND (NOT $12 OR category='breeding' OR event_id=ANY($13::integer[])) AND ($14::integer=0 OR event_id=$14) ORDER BY document_id LIMIT $11`, f.After, f.TypeID, f.DogID, f.MemberID, f.Number, f.From, f.To, owner, dogs, vet, f.Limit+1, expert, assigned, f.EventID)

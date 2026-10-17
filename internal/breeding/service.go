@@ -12,20 +12,22 @@ import (
 	"dogclub.local/backend/internal/auth"
 	"dogclub.local/backend/internal/dogs"
 	"dogclub.local/backend/internal/members"
+	"dogclub.local/backend/internal/platform/notify"
 	"dogclub.local/backend/internal/veterinary"
 
 	"github.com/jackc/pgx/v5"
 )
 
 type Service struct {
-	access     *auth.Service
-	dogs       *dogs.Service
-	veterinary *veterinary.Service
-	now        func() time.Time
+	notifications notify.Sink
+	access        *auth.Service
+	dogs          *dogs.Service
+	veterinary    *veterinary.Service
+	now           func() time.Time
 }
 
 func NewService(a *auth.Service, d *dogs.Service, v *veterinary.Service) *Service {
-	return &Service{a, d, v, time.Now}
+	return &Service{access: a, dogs: d, veterinary: v, now: time.Now}
 }
 
 var readRoles = []string{"staff", "expert", "leader", "owner"}
@@ -97,6 +99,7 @@ func domainError(err error) error {
 func with[T any](ctx context.Context, s *Service, p auth.Principal, roles []string, fn func(context.Context, *repository, auth.Principal) (T, error)) (T, error) {
 	var out T
 	err := s.access.WithAccess(ctx, p, roles, func(ctx context.Context, tx pgx.Tx, current auth.Principal) error {
+		ctx = notify.WithSink(ctx, s.notifications)
 		if current.Profile.Role == "owner" {
 			if _, err := s.dogs.BreedingOwnerDogs(ctx, tx, current); err != nil {
 				return domainError(err)
@@ -783,3 +786,5 @@ func (s *Service) History(ctx context.Context, p auth.Principal, entity string, 
 		return out, err
 	})
 }
+
+func (s *Service) SetNotificationSink(sink notify.Sink) { s.notifications = sink }

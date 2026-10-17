@@ -17,6 +17,11 @@ func (s *Service) CheckForEvents(ctx context.Context, tx pgx.Tx, p auth.Principa
 	if err := auth.RequireProfile(p, "staff", "expert", "leader", "owner"); err != nil {
 		return Admission{}, err
 	}
+	return s.NotificationAdmission(ctx, tx, dogID, start, end)
+}
+
+// NotificationAdmission is a trusted projection in a guarded worker transaction.
+func (s *Service) NotificationAdmission(ctx context.Context, tx pgx.Tx, dogID int32, start, end string) (Admission, error) {
 	for _, d := range []string{start, end} {
 		v, err := time.Parse(time.DateOnly, d)
 		if err != nil || v.Year() < 1 {

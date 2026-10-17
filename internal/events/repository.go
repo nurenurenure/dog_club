@@ -358,7 +358,10 @@ func (q *repository) record(ctx context.Context, p auth.Principal, eventID *int3
 		return err
 	}
 	_, err = q.tx.Exec(ctx, `INSERT INTO event_changes(event_id,entity,entity_id,actor_user_id,actor_profile_id,action,reason,before_data,after_data,request_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, eventID, entity, id, p.User.ID, p.Profile.ID, action, reason, old, next, auth.RequestID(ctx))
-	return storageError(err)
+	if err != nil {
+		return storageError(err)
+	}
+	return q.notification(ctx, eventID, entity, action, before, after)
 }
 func (q *repository) history(ctx context.Context, eventID *int32, entity string, id int64, f Filter) (Page[Change], error) {
 	out := Page[Change]{Records: []Change{}}

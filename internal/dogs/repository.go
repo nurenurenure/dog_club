@@ -264,7 +264,10 @@ func (q *repository) record(ctx context.Context, p auth.Principal, action, reaso
 		return ErrUnavailable
 	}
 	_, err = q.tx.Exec(ctx, `INSERT INTO dog_changes(dog_id,actor_user_id,actor_profile_id,actor_role,action,reason,before_data,after_data,request_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, after.ID, p.User.ID, p.Profile.ID, p.Profile.Role, action, reason, old, json.RawMessage(next), auth.RequestID(ctx))
-	return storageError(err)
+	if err != nil {
+		return storageError(err)
+	}
+	return q.notification(ctx, action, before, after)
 }
 func likePattern(s string) string {
 	return "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(s) + "%"

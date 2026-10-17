@@ -13,20 +13,22 @@ import (
 	"dogclub.local/backend/internal/events"
 	"dogclub.local/backend/internal/members"
 	"dogclub.local/backend/internal/platform/filestore"
+	"dogclub.local/backend/internal/platform/notify"
 	"dogclub.local/backend/internal/veterinary"
 
 	"github.com/jackc/pgx/v5"
 )
 
 type Service struct {
-	access   *auth.Service
-	members  *members.Service
-	dogs     *dogs.Service
-	vet      *veterinary.Service
-	files    *filestore.Store
-	now      func() time.Time
-	breeding *breeding.Service
-	events   *events.Service
+	notifications notify.Sink
+	access        *auth.Service
+	members       *members.Service
+	dogs          *dogs.Service
+	vet           *veterinary.Service
+	files         *filestore.Store
+	now           func() time.Time
+	breeding      *breeding.Service
+	events        *events.Service
 }
 
 func NewService(a *auth.Service, m *members.Service, d *dogs.Service, v *veterinary.Service, f *filestore.Store, b *breeding.Service, e *events.Service) *Service {
@@ -61,6 +63,7 @@ func domainError(err error) error {
 }
 func (s *Service) with(ctx context.Context, p auth.Principal, roles []string, fn func(context.Context, *repository, auth.Principal) error) error {
 	return domainError(s.access.WithAccess(ctx, p, roles, func(ctx context.Context, tx pgx.Tx, p auth.Principal) error {
+		ctx = notify.WithSink(ctx, s.notifications)
 		if p.Profile.Role == "owner" {
 			if _, err := s.members.RequireActiveOwner(ctx, tx, p); err != nil {
 				return err
@@ -429,3 +432,5 @@ func (s *Service) History(ctx context.Context, p auth.Principal, id int32, f Fil
 }
 
 func same64(a, b *int64) bool { return a == nil && b == nil || a != nil && b != nil && *a == *b }
+
+func (s *Service) SetNotificationSink(sink notify.Sink) { s.notifications = sink }

@@ -2636,6 +2636,15 @@ components:
         MedicalVaccination:
             additionalProperties: false
             properties:
+                replaces_vaccination_ids:
+                    description: Прежние вакцинации этой собаки, заменённые для напоминаний; медицинские факты и допуск сохраняются. При исправлении пропуск сохраняет связи, пустой массив явно очищает их.
+                    type: array
+                    maxItems: 100
+                    uniqueItems: true
+                    items:
+                        type: integer
+                        format: int32
+                        minimum: 1
                 author:
                     $ref: '#/components/schemas/MedicalAuthor'
                 date:
@@ -2682,6 +2691,17 @@ components:
         MedicalVaccinationInput:
             additionalProperties: false
             properties:
+                replaces_vaccination_ids:
+                    description: Прежние вакцинации этой собаки, заменённые для напоминаний; медицинские факты и допуск сохраняются. При исправлении пропуск сохраняет связи, пустой массив явно очищает их.
+                    type:
+                        - array
+                        - "null"
+                    maxItems: 100
+                    uniqueItems: true
+                    items:
+                        type: integer
+                        format: int32
+                        minimum: 1
                 date:
                     format: date
                     type: string
@@ -2714,6 +2734,17 @@ components:
         MedicalVaccinationUpdate:
             additionalProperties: false
             properties:
+                replaces_vaccination_ids:
+                    description: Прежние вакцинации этой собаки, заменённые для напоминаний; медицинские факты и допуск сохраняются. При исправлении пропуск сохраняет связи, пустой массив явно очищает их.
+                    type:
+                        - array
+                        - "null"
+                    maxItems: 100
+                    uniqueItems: true
+                    items:
+                        type: integer
+                        format: int32
+                        minimum: 1
                 date:
                     format: date
                     type: string

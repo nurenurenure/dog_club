@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"dogclub.local/backend/internal/platform/database"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -31,7 +32,7 @@ func (r *Repository) transaction(ctx context.Context, fn func(*queries) error) e
 		return ErrUnavailable
 	}
 	defer tx.Rollback(context.Background())
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(476320041)"); err != nil {
+	if err := database.Guard(ctx, tx); err != nil {
 		return ErrUnavailable
 	}
 	if err := fn(&queries{db: tx}); err != nil {

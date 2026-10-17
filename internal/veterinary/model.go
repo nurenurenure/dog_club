@@ -88,19 +88,21 @@ type ExaminationUpdate struct {
 	Reason  string `json:"reason"`
 }
 type Vaccination struct {
-	ID         int32       `json:"id"`
-	DogID      int32       `json:"dog_id"`
-	Date       string      `json:"date"`
-	ValidUntil *string     `json:"valid_until"`
-	NextDate   *string     `json:"next_date"`
-	Vaccine    VaccineType `json:"vaccine"`
-	Author     Author      `json:"author"`
-	Version    int64       `json:"version"`
-	IsVoid     bool        `json:"is_void"`
+	ReplacesVaccinationIDs []int32     `json:"replaces_vaccination_ids,omitempty"`
+	ID                     int32       `json:"id"`
+	DogID                  int32       `json:"dog_id"`
+	Date                   string      `json:"date"`
+	ValidUntil             *string     `json:"valid_until"`
+	NextDate               *string     `json:"next_date"`
+	Vaccine                VaccineType `json:"vaccine"`
+	Author                 Author      `json:"author"`
+	Version                int64       `json:"version"`
+	IsVoid                 bool        `json:"is_void"`
 }
 type VaccinationInput struct {
-	Date          string `json:"date"`
-	VaccineTypeID int32  `json:"vaccine_type_id"`
+	ReplacesVaccinationIDs []int32 `json:"replaces_vaccination_ids,omitempty"`
+	Date                   string  `json:"date"`
+	VaccineTypeID          int32   `json:"vaccine_type_id"`
 }
 type VaccinationUpdate struct {
 	VaccinationInput
