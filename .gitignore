@@ -3,6 +3,7 @@
 !.env.example
 /context/sources/
 /context/reference/
+/ai_context/
 *.pdf
 .DS_Store
 .idea/
@@ -11,5 +12,9 @@
 /tmp/
 /bin/
 /coverage.out
+/backend/tmp/
+/backend/bin/
+/backend/coverage.out
 
 /var/
+/backend/var/

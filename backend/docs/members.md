@@ -122,7 +122,7 @@ advisory lock и повторную проверку аккаунта/сесси
 
 ## Ручная проверка
 
-Запуск, экспорт .env и приглашение первого администратора — в [README](../README.md)
+Запуск, экспорт .env и приглашение первого администратора — в [README](../../README.md)
 и [auth.md](auth.md). В API-клиенте войдите как admin, возьмите свой user.id и
 создайте профиль через POST /users/{userID}/profiles с `{"role":"staff"}`.
 Переключитесь через POST /auth/switch-profile с полученным profile_id и используйте

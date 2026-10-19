@@ -230,7 +230,7 @@ veterinary_clearance, clearance_vaccination и veterinary_changes. После м
 
 ## Проверка
 
-Запуск, миграции и аккаунты — в [README](../README.md) и [auth.md](auth.md).
+Запуск, миграции и аккаунты — в [README](../../README.md) и [auth.md](auth.md).
 Под staff создайте карточку ветеринара, под admin привяжите её к аккаунту через
 PUT /users/{userID}/member, назначьте профиль veterinarian и переключитесь на него.
 Подготовьте собаку и владельца по [dogs.md](dogs.md). Добавьте препарат с

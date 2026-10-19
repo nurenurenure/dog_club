@@ -8,7 +8,7 @@ ELK, Telegram, REST-ящик уведомлений и WebSocket не настр
 
 Нужны Docker Engine/Desktop и Compose с `up --wait`, `service_healthy` и
 `service_completed_successfully`. Go на компьютере для Docker-режима не нужен.
-Из корня backend скопируйте `.env.example` в `.env`, если своего файла ещё нет.
+Из корня репозитория скопируйте `.env.example` в `.env`, если своего файла ещё нет.
 Задайте случайные `POSTGRES_PASSWORD` (URI-safe hexadecimal) и `AUTH_JWT_KEY`
 (base64 минимум 32 случайных байт). Существующую `.env` не заменяйте примером.
 Секреты остаются в локальной `.env`, не в образе или Git. Не публикуйте вывод
@@ -92,7 +92,7 @@ API, не на произвольных внешних писателей. Не 
 
 ```sh
 mkdir -p var/backups
-scripts/backup.sh /absolute/path/to/backend/var/backups/2026-10-17
+scripts/backup.sh /absolute/path/to/dog_club/var/backups/2026-10-17
 ```
 
 Каталог назначения должен отсутствовать. Скрипт корректно останавливает HTTP и

@@ -3,7 +3,7 @@ name: dogclub
 x-app: &app
   image: ${DOGCLUB_IMAGE:-dogclub-backend:local}
   build:
-    context: .
+    context: ./backend
     target: runtime
   environment:
     DATABASE_URL: postgres://${POSTGRES_USER:-dogclub}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-dogclub}?sslmode=disable
@@ -49,7 +49,7 @@ services:
   checks:
     profiles: [tools]
     build:
-      context: .
+      context: ./backend
       target: sdk
     environment:
       DOGCLUB_TEST_DATABASE_URL: postgres://${POSTGRES_USER:-dogclub}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-dogclub}?sslmode=disable
