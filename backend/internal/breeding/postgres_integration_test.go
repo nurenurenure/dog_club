@@ -133,10 +133,16 @@ func TestPostgresBreedingLifecycleAndAccess(t *testing.T) {
 	expect(err, auth.ErrForbidden)
 	vaccine, err := v.CreateVaccineType(ctx, vet, veterinary.VaccineTypeInput{Name: "Test configured vaccine", Validity: veterinary.Period{Value: 120, Unit: "months"}, Revaccination: veterinary.Period{Value: 12, Unit: "months"}})
 	must(err)
+	doses := map[int32]veterinary.Vaccination{}
 	health := func(id int32, date string) veterinary.Clearance {
 		t.Helper()
-		dose, err := v.CreateVaccination(ctx, vet, id, veterinary.VaccinationInput{Date: "2021-01-01", VaccineTypeID: vaccine.ID})
-		must(err)
+		// A repeated clearance reuses the still valid dose: lab 3 forbids overlapping ones.
+		dose, ok := doses[id]
+		if !ok {
+			dose, err = v.CreateVaccination(ctx, vet, id, veterinary.VaccinationInput{Date: "2021-01-01", VaccineTypeID: vaccine.ID})
+			must(err)
+			doses[id] = dose
+		}
 		exam, err := v.CreateExamination(ctx, vet, id, veterinary.ExaminationInput{Date: date, Result: "PRIVATE_CLINICAL_PROSE", Diagnoses: []veterinary.DiagnosisInput{{DiseaseID: 1, IsHereditary: ptr(true)}}})
 		must(err)
 		clearance, err := v.CreateClearance(ctx, vet, id, veterinary.ClearanceInput{ExaminationID: exam.ID, Purpose: "breeding", Decision: "allowed", ValidUntil: ptr("2029-12-31"), VaccinationIDs: []int32{dose.ID}})

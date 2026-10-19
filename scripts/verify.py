@@ -116,7 +116,7 @@ def check():
     compose('build', 'api', 'checks', timeout=600)
     compose('up', '-d', '--wait', 'api', timeout=180)
     BASE = endpoint('api', 8080); MAIL = endpoint('mailpit', 8025)
-    ready(); assert sql('SELECT max(version_id) FROM goose_db_version WHERE is_applied') == '13'
+    ready(); assert sql('SELECT max(version_id) FROM goose_db_version WHERE is_applied') == '14'
     assert compose('exec', '-T', 'api', 'id', '-u').strip() == b'65532'
     compose('exec', '-T', 'api', '/maintenance')
     admin = Client(); anonymous = Client()

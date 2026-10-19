@@ -40,6 +40,17 @@ type Summary struct {
 	HeightCM    *float64   `json:"height_cm"`
 	WeightKG    *float64   `json:"weight_kg"`
 	Version     int64      `json:"version"`
+	// Active follows the current status dictionary; it is not part of snapshots.
+	Active bool `json:"-"`
+}
+
+// Inactive is the lab-3 rule: no new clinical, training, breeding or event facts.
+func (s Summary) Inactive() bool { return !s.Active }
+
+type Status struct {
+	ID       int32  `json:"id"`
+	Name     string `json:"name"`
+	IsActive bool   `json:"is_active"`
 }
 type Relative struct {
 	ID             int32      `json:"id"`
@@ -178,7 +189,7 @@ type HistoryPage struct {
 	NextAfter *int64   `json:"next_after"`
 }
 type Dictionaries struct {
-	Statuses        []Dictionary `json:"statuses"`
+	Statuses        []Status     `json:"statuses"`
 	Breeds          []Dictionary `json:"breeds"`
 	CoatColors      []Dictionary `json:"coat_colors"`
 	Sexes           []Dictionary `json:"sexes"`

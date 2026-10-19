@@ -66,14 +66,23 @@ func TestFileTypesNamesAndDates(t *testing.T) {
 			t.Fatal("unsafe file accepted")
 		}
 	}
+	const today = "2026-10-17"
 	in := Input{TypeID: 1, DogID: ptr(int32(1)), IssueDate: ptr("2026-02-30")}
-	if validate(&in) == nil {
+	if validate(&in, today) == nil {
 		t.Fatal("impossible date accepted")
 	}
 	in.IssueDate = ptr("2026-10-17")
 	in.ExpiresOn = ptr("2026-10-16")
-	if validate(&in) == nil {
+	if validate(&in, today) == nil {
 		t.Fatal("reversed validity accepted")
+	}
+	in.ExpiresOn = nil
+	if err := validate(&in, today); err != nil {
+		t.Fatalf("document issued today rejected: %v", err)
+	}
+	in.IssueDate = ptr("2026-10-18")
+	if validate(&in, today) == nil {
+		t.Fatal("future issue date accepted")
 	}
 }
 

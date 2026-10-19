@@ -67,8 +67,7 @@ func (s *Service) NotificationOwnerIDs(ctx context.Context, tx pgx.Tx, ids []int
 	return out, storageError(rows.Err())
 }
 func (s *Service) NotificationAnimal(ctx context.Context, tx pgx.Tx, id int32) (EventAnimal, error) {
-	d, err := (&repository{tx}).card(ctx, id)
-	return EventAnimal{d.Summary, d.Pedigree.Number, d.Pedigree.Issuer, d.Titles}, err
+	return (&repository{tx}).eventAnimal(ctx, id)
 }
 func (s *Service) NotificationRepresentative(ctx context.Context, tx pgx.Tx, dog, member int32) error {
 	return (&repository{tx}).owns(ctx, dog, member)

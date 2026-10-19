@@ -368,6 +368,9 @@ components:
                     type: string
                 pedigree:
                     $ref: '#/components/schemas/DogPedigree'
+                pedigree_known_3_generations:
+                    description: Заполнены номер и организация документа родословной, либо родители и деды — карточки клуба, а все прадеды известны. Отсутствует в снимках до версии 0.11.
+                    type: boolean
                 sex:
                     $ref: '#/components/schemas/DogDictionary'
                 status:
@@ -400,6 +403,29 @@ components:
                 - weight_kg
                 - version
             type: object
+        BreedingMateCandidates:
+            additionalProperties: false
+            properties:
+                as_of:
+                    format: date
+                    type: string
+                candidates:
+                    items:
+                        $ref: '#/components/schemas/DogSummary'
+                    type: array
+                dog_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                truncated:
+                    description: true — под SQL-фильтр попало больше 500 собак; проверены первые 500 по ID.
+                    type: boolean
+            required:
+                - dog_id
+                - as_of
+                - candidates
+                - truncated
+            type: object
         BreedingAssessment:
             additionalProperties: false
             properties:
@@ -410,12 +436,17 @@ components:
                     items:
                         enum:
                             - same_dog
+                            - female_inactive
+                            - male_inactive
                             - pair_sex
                             - different_breeds
                             - pair_birth_dates
                             - identifier_missing
                             - female_medical_clearance
                             - male_medical_clearance
+                            - parent_child
+                            - shared_parent
+                            - common_ancestor_3_generations
                             - expected_birth_date_required
                             - litter_interval
                             - expected_birth_before_mating
@@ -1466,7 +1497,7 @@ components:
                     type: array
                 statuses:
                     items:
-                        $ref: '#/components/schemas/DogDictionary'
+                        $ref: '#/components/schemas/DogStatus'
                     type: array
                 titles:
                     items:
@@ -1492,6 +1523,23 @@ components:
             required:
                 - id
                 - name
+            type: object
+        DogStatus:
+            additionalProperties: false
+            properties:
+                id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                is_active:
+                    description: false — «Снята с учёта», «Умерла», «Потеряна», «Исключена». Новые и исправленные осмотры, вакцинации, занятия, вязки и допуски к мероприятиям запрещены.
+                    type: boolean
+                name:
+                    type: string
+            required:
+                - id
+                - name
+                - is_active
             type: object
         DogExternalParent:
             additionalProperties: false
@@ -3594,6 +3642,9 @@ components:
                     type: string
                 pedigree_issuer:
                     type: string
+                pedigree_known_3_generations:
+                    description: Заполнены номер и организация документа родословной, либо родители и деды — карточки клуба, а все прадеды известны. Отсутствует в снимках до версии 0.11.
+                    type: boolean
                 pedigree_number:
                     type: string
                 sex:
@@ -3853,6 +3904,8 @@ components:
                             - registration_cancelled
                             - dog_required
                             - people_only
+                            - dog_inactive
+                            - pedigree_incomplete
                             - identifier_missing
                             - representative_not_owner
                             - class_required
@@ -5817,7 +5870,7 @@ components:
 info:
     description: Этапы 04–09 и части 1–4 этапа 10. Закрытые документы, девять документных PDF-форм и сводный отчёт в JSON/PDF/CSV без серверного архива. Права, версии, история и снимки документов; показатели за период, текущие итоги и полнота дат отчёта.
     title: Клуб собаководства — backend
-    version: 0.10.3
+    version: 0.11.0
 openapi: 3.1.1
 paths:
     /api/v1/operations/metrics:
@@ -6468,6 +6521,56 @@ paths:
             security:
                 - bearerAuth: []
             summary: 'Поиск без владельцев: staff/expert/leader'
+            tags:
+                - Breeding
+    /api/v1/breeding/dogs/{dogID}/mate-candidates:
+        get:
+            operationId: listMateCandidates
+            description: 'Подбор пары (лаб. 3, fn_suggest_mates) на сегодня: активные собаки противоположного пола той же породы в возрасте 24–120 полных месяцев, без подтверждённых наследственных диагнозов и без близкого родства в трёх поколениях. Суки — только без незакрытых вязок и одобренных заявок, если с последнего рождения прошло 365 дней. Владельцы не раскрываются.'
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/BreedingMateCandidates'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/BreedingConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/BreedingUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Подбор пары для вязки: staff/expert/leader'
             tags:
                 - Breeding
     /api/v1/breedings:

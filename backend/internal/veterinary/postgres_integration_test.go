@@ -384,6 +384,9 @@ func TestPostgresVeterinaryLifecycleAndAccess(t *testing.T) {
 	contract, err := legacy.NewRouter(doc)
 	must(err)
 	root := fmt.Sprintf("/api/v1/dogs/%d", patient.ID)
+	// A separate product: the patient's earlier doses of the fixture are still current.
+	httpProduct, err := s.CreateVaccineType(ctx, vet, VaccineTypeInput{Name: "HTTP dose product", Validity: Period{Value: 12, Unit: "months"}, Revaccination: Period{Value: 12, Unit: "months"}})
+	must(err)
 	for _, test := range []struct {
 		method, path, token, body string
 		status                    int
@@ -397,7 +400,7 @@ func TestPostgresVeterinaryLifecycleAndAccess(t *testing.T) {
 		{"GET", root + "/veterinary-history?limit=1", ownerCredentials.AccessToken, "", 200},
 		{"GET", fmt.Sprintf("/api/v1/vaccine-types/%d/history", vaccine.ID), vetCredentials.AccessToken, "", 200},
 		{"POST", root + "/examinations", vetCredentials.AccessToken, `{"date":"2024-03-01","result":"HTTP assessment"}`, 201},
-		{"POST", root + "/vaccinations", vetCredentials.AccessToken, fmt.Sprintf(`{"date":"2024-03-01","vaccine_type_id":%d}`, vaccine.ID), 201},
+		{"POST", root + "/vaccinations", vetCredentials.AccessToken, fmt.Sprintf(`{"date":"2024-03-01","vaccine_type_id":%d}`, httpProduct.ID), 201},
 		{"POST", root + "/clearances", vetCredentials.AccessToken, fmt.Sprintf(`{"examination_id":%d,"purpose":"events","decision":"allowed","valid_until":"2024-12-31","vaccination_ids":[%d]}`, newExam.ID, dose.ID), 201},
 		{"PUT", fmt.Sprintf("%s/examinations/%d", root, exam.ID), vetCredentials.AccessToken, `{"date":"2024-02-01","version":2,"reason":"HTTP correction"}`, 200},
 		{"PUT", fmt.Sprintf("%s/vaccinations/%d", root, dose.ID), vetCredentials.AccessToken, fmt.Sprintf(`{"date":"2024-02-01","vaccine_type_id":%d,"version":3,"reason":"HTTP correction"}`, vaccine.ID), 200},

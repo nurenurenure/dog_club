@@ -3,6 +3,7 @@ package veterinary
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 	"unicode"
@@ -140,6 +141,25 @@ func withDog[T any](ctx context.Context, s *Service, p auth.Principal, dogID int
 		return err
 	})
 	return out, err
+}
+
+// activeDog applies lab 3 fn_dog_active_check to new and corrected clinical facts.
+// Voiding stays available so that erroneous records can still be withdrawn.
+func activeDog(dog dogs.Summary) error {
+	if dog.Inactive() {
+		return invalid("dog_id", fmt.Sprintf("Собака имеет статус «%s»: медицинские записи не добавляются и не исправляются.", dog.Status.Name))
+	}
+	return nil
+}
+
+// noActiveVaccination applies lab 3 fn_prevent_active_vaccination: revaccination
+// windows [date, next_date) of one product never overlap for the same dog.
+func noActiveVaccination(ctx context.Context, q *repository, dogID, id int32, typeID int32, date, next string) error {
+	other, otherNext, found, err := q.overlappingVaccination(ctx, dogID, id, typeID, date, next)
+	if err != nil || !found {
+		return err
+	}
+	return invalid("date", fmt.Sprintf("Вакцинация этим препаратом от %s ещё действует до %s; новую дозу можно внести с этой даты.", other, otherNext))
 }
 func validPage(f PageFilter, serial bool) error {
 	if f.After < 0 || f.Limit < 1 || f.Limit > 100 || (serial && f.After > 2147483647) {
@@ -302,6 +322,9 @@ func validateExamination(in *ExaminationInput, birth string, now time.Time) erro
 }
 func (s *Service) CreateExamination(ctx context.Context, p auth.Principal, dogID int32, in ExaminationInput) (Examination, error) {
 	return withDog(ctx, s, p, dogID, true, func(ctx context.Context, q *repository, current auth.Principal, dog dogs.Summary) (Examination, error) {
+		if err := activeDog(dog); err != nil {
+			return Examination{}, err
+		}
 		if err := validateExamination(&in, dog.DateOfBirth, s.now()); err != nil {
 			return Examination{}, err
 		}
@@ -328,6 +351,9 @@ func (s *Service) UpdateExamination(ctx context.Context, p auth.Principal, dogID
 		if err := ownRecord(current, before.Author, before.Version, in.Version, before.IsVoid); err != nil {
 			return Examination{}, err
 		}
+		if err := activeDog(dog); err != nil {
+			return Examination{}, err
+		}
 		if err := validateExamination(&in.ExaminationInput, dog.DateOfBirth, s.now()); err != nil {
 			return Examination{}, err
 		}
@@ -348,8 +374,14 @@ func (s *Service) GetExamination(ctx context.Context, p auth.Principal, dogID, i
 }
 func (s *Service) CreateVaccination(ctx context.Context, p auth.Principal, dogID int32, in VaccinationInput) (Vaccination, error) {
 	return withDog(ctx, s, p, dogID, true, func(ctx context.Context, q *repository, current auth.Principal, dog dogs.Summary) (Vaccination, error) {
+		if err := activeDog(dog); err != nil {
+			return Vaccination{}, err
+		}
 		vaccine, until, next, err := s.calculateVaccination(ctx, q, in, dog.DateOfBirth)
 		if err != nil {
+			return Vaccination{}, err
+		}
+		if err := noActiveVaccination(ctx, q, dogID, 0, in.VaccineTypeID, in.Date, next); err != nil {
 			return Vaccination{}, err
 		}
 		if err := q.validateReminderReplacements(ctx, dogID, 0, in); err != nil {
@@ -405,12 +437,18 @@ func (s *Service) UpdateVaccination(ctx context.Context, p auth.Principal, dogID
 		if err := ownRecord(current, before.Author, before.Version, in.Version, before.IsVoid); err != nil {
 			return Vaccination{}, err
 		}
+		if err := activeDog(dog); err != nil {
+			return Vaccination{}, err
+		}
 		vaccine := before.Vaccine
 		until, next := before.ValidUntil, before.NextDate
 		if before.Date != in.Date || before.Vaccine.ID != in.VaccineTypeID {
 			var u, n string
 			vaccine, u, n, err = s.calculateVaccination(ctx, q, in.VaccinationInput, dog.DateOfBirth)
 			if err != nil {
+				return Vaccination{}, err
+			}
+			if err := noActiveVaccination(ctx, q, dogID, id, in.VaccineTypeID, in.Date, n); err != nil {
 				return Vaccination{}, err
 			}
 			until, next = &u, &n

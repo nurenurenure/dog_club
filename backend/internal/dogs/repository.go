@@ -36,13 +36,13 @@ func storageError(err error) error {
 const summaryColumns = `d.dog_id,d.dog_nickname,to_char(d.dog_date_of_birth,'YYYY-MM-DD'),
 d.identifier_type_id,COALESCE(it.identifier_type_name,''),d.dog_identifier_number,to_char(d.dog_identifier_date,'YYYY-MM-DD'),
 d.dog_status_id,st.dog_status_name,d.dog_breed_id,b.dog_breed_name,d.coat_color_id,c.coat_color_name,d.sex_id,s.sex_name,
-d.height_cm::float8,d.weight_kg::float8,d.version`
+d.height_cm::float8,d.weight_kg::float8,d.version,st.is_active`
 const summaryFrom = ` FROM dog d JOIN identifier_type it USING(identifier_type_id) JOIN dog_status st USING(dog_status_id)
 JOIN dog_breed b USING(dog_breed_id) JOIN coat_color c USING(coat_color_id) JOIN sex s USING(sex_id)`
 
 func scanSummary(row pgx.Row) (Summary, error) {
 	var d Summary
-	err := row.Scan(&d.ID, &d.Nickname, &d.DateOfBirth, &d.Identifier.Type.ID, &d.Identifier.Type.Name, &d.Identifier.Number, &d.Identifier.Date, &d.Status.ID, &d.Status.Name, &d.Breed.ID, &d.Breed.Name, &d.CoatColor.ID, &d.CoatColor.Name, &d.Sex.ID, &d.Sex.Name, &d.HeightCM, &d.WeightKG, &d.Version)
+	err := row.Scan(&d.ID, &d.Nickname, &d.DateOfBirth, &d.Identifier.Type.ID, &d.Identifier.Type.Name, &d.Identifier.Number, &d.Identifier.Date, &d.Status.ID, &d.Status.Name, &d.Breed.ID, &d.Breed.Name, &d.CoatColor.ID, &d.CoatColor.Name, &d.Sex.ID, &d.Sex.Name, &d.HeightCM, &d.WeightKG, &d.Version, &d.Active)
 	return d, storageError(err)
 }
 func (q *repository) summary(ctx context.Context, id int32) (Summary, error) {
@@ -323,12 +323,11 @@ func (q *repository) history(ctx context.Context, id int32, after int64, limit i
 	return page, nil
 }
 func (q *repository) dictionaries(ctx context.Context) (Dictionaries, error) {
-	d := Dictionaries{Statuses: []Dictionary{}, Breeds: []Dictionary{}, CoatColors: []Dictionary{}, Sexes: []Dictionary{}, IdentifierTypes: []Dictionary{}, Titles: []Dictionary{}}
+	d := Dictionaries{Statuses: []Status{}, Breeds: []Dictionary{}, CoatColors: []Dictionary{}, Sexes: []Dictionary{}, IdentifierTypes: []Dictionary{}, Titles: []Dictionary{}}
 	for _, entry := range []struct {
 		sql string
 		out *[]Dictionary
 	}{
-		{`SELECT dog_status_id,dog_status_name FROM dog_status ORDER BY dog_status_id`, &d.Statuses},
 		{`SELECT dog_breed_id,dog_breed_name FROM dog_breed ORDER BY dog_breed_id`, &d.Breeds},
 		{`SELECT coat_color_id,coat_color_name FROM coat_color ORDER BY coat_color_id`, &d.CoatColors},
 		{`SELECT sex_id,sex_name FROM sex ORDER BY sex_id`, &d.Sexes},
@@ -353,5 +352,17 @@ func (q *repository) dictionaries(ctx context.Context) (Dictionaries, error) {
 			return d, storageError(err)
 		}
 	}
-	return d, nil
+	rows, err := q.tx.Query(ctx, `SELECT dog_status_id,dog_status_name,is_active FROM dog_status ORDER BY dog_status_id`)
+	if err != nil {
+		return d, storageError(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var v Status
+		if rows.Scan(&v.ID, &v.Name, &v.IsActive) != nil {
+			return d, ErrUnavailable
+		}
+		d.Statuses = append(d.Statuses, v)
+	}
+	return d, storageError(rows.Err())
 }

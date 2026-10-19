@@ -32,7 +32,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if err := Run(ctx, "status", url, &output); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(output.String(), "pending") != 13 || scalar(t, ctx, conn,
+	if strings.Count(output.String(), "pending") != 14 || scalar(t, ctx, conn,
 		`SELECT count(*) FROM pg_tables WHERE schemaname='public'`) != 0 {
 		t.Fatal("status on an empty database must list pending migrations without creating tables")
 	}
@@ -46,7 +46,7 @@ func TestPostgresMigrations(t *testing.T) {
 			t.Fatalf("unexpected migration result: %q", output.String())
 		}
 	}
-	apply("applied 13 migration(s)\n")
+	apply("applied 14 migration(s)\n")
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 66 {
 		t.Fatalf("expected 65 application tables and Goose history, got %d", count)
 	}
@@ -57,8 +57,8 @@ func TestPostgresMigrations(t *testing.T) {
 	checkSeeds(t, ctx, conn)
 	apply("applied 0 migration(s)\n")
 	output.Reset()
-	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 13 {
-		t.Fatalf("expected thirteen applied versions: %v %q", err, output.String())
+	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 14 {
+		t.Fatalf("expected fourteen applied versions: %v %q", err, output.String())
 	}
 
 	t.Run("constraints and deletion policies", func(t *testing.T) {
@@ -168,7 +168,7 @@ func TestPostgresMigrations(t *testing.T) {
 		checkSeeds(t, ctx, conn)
 	})
 
-	for range 13 {
+	for range 14 {
 		if err := Run(ctx, "down", url, io.Discard); err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 1 {
 		t.Fatalf("full rollback must leave only Goose history, got %d tables", count)
 	}
-	apply("applied 13 migration(s)\n")
+	apply("applied 14 migration(s)\n")
 	checkSeeds(t, ctx, conn)
 }
 
@@ -444,6 +444,12 @@ func checkSeeds(t *testing.T, ctx context.Context, conn *pgx.Conn) {
 		}
 		if table == "document_type" && scalar(t, ctx, conn, `SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='document' AND column_name='event_id'`) > 0 {
 			count += 2
+		}
+		if table == "dog_status" && scalar(t, ctx, conn, `SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='dog_status' AND column_name='is_active'`) > 0 {
+			count += 3
+			if got := scalar(t, ctx, conn, `SELECT count(*) FROM dog_status WHERE is_active`); got != 1 {
+				t.Errorf("dog_status: expected only «На учёте» active, got %d", got)
+			}
 		}
 		if got := scalar(t, ctx, conn, "SELECT count(*) FROM "+pgx.Identifier{table}.Sanitize()); got != count {
 			t.Errorf("%s: expected %d seed rows, got %d", table, count, got)
@@ -720,6 +726,8 @@ func TestTrainingUpgradePreservesLegacyAndProtectsGrants(t *testing.T) {
 	if scalar(t, ctx, conn, `SELECT count(*) FROM dog_training_session WHERE dog_id=1201 AND dog_training_session_id=1201 AND club_member_id=1201 AND dog_training_session_start_date='2024-02-02 23:59:59.123456' AND dog_training_session_end_date IS NULL AND starts_at IS NULL AND timezone IS NULL AND result IS NULL AND instructor_profile_id IS NULL AND medical_snapshot IS NULL AND event_id IS NULL AND version=1 AND NOT is_void`) != 1 {
 		t.Fatal("legacy time/author/qualification was fabricated")
 	}
+	// Later migrations are rolled back first; this test targets 00013 itself.
+	rollbackTo(t, ctx, url, 13)
 	if err := Run(ctx, "down", url, io.Discard); err != nil {
 		t.Fatal(err)
 	}
@@ -734,10 +742,41 @@ func TestTrainingUpgradePreservesLegacyAndProtectsGrants(t *testing.T) {
  INSERT INTO training_instructor(profile_id,user_id,member_id,enabled,qualification) VALUES('training-test-profile','training-test-user',1201,false,'Synthetic grant history')`); err != nil {
 		t.Fatal(err)
 	}
+	rollbackTo(t, ctx, url, 13)
 	if err := Run(ctx, "down", url, io.Discard); err == nil {
 		t.Fatal("rollback discarded instructor grant")
 	}
 	if scalar(t, ctx, conn, `SELECT count(*) FROM training_instructor`) != 1 {
 		t.Fatal("failed rollback lost grant")
 	}
+}
+
+func TestDogStatusActivityRollbackProtectsDogs(t *testing.T) {
+	ctx, url, conn := testDatabase(t)
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM dog_status WHERE NOT is_active AND dog_status_name IN ('Снята с учёта','Умерла','Потеряна','Исключена')`) != 4 {
+		t.Fatal("inactive lab statuses missing")
+	}
+	if _, err := conn.Exec(ctx, `INSERT INTO dog(dog_id,dog_nickname,dog_date_of_birth,dog_identifier_number,dog_status_id,identifier_type_id,dog_breed_id,coat_color_id,sex_id)
+ SELECT 1401,'Synthetic lost dog','2020-01-01','STATUS-1401',dog_status_id,1,1,1,1 FROM dog_status WHERE dog_status_name='Потеряна'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "down", url, io.Discard); err == nil || !strings.Contains(err.Error(), "23001") {
+		t.Fatalf("rollback orphaned a dog status: %v", err)
+	}
+	if _, err := conn.Exec(ctx, `DELETE FROM dog WHERE dog_id=1401`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "down", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM dog_status`) != 2 {
+		t.Fatal("rollback left added statuses")
+	}
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	checkSeeds(t, ctx, conn)
 }

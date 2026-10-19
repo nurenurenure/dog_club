@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -313,6 +314,10 @@ func (s *Service) save(ctx context.Context, p auth.Principal, dog, id int32, ver
 		animal, err := s.dogs.ReadForVeterinary(ctx, q.tx, p, dog)
 		if err != nil {
 			return Session{}, err
+		}
+		// Lab 3 fn_dog_active_check: inactive dogs get no new or corrected sessions.
+		if animal.Inactive() {
+			return Session{}, invalid("dog_id", fmt.Sprintf("Собака имеет статус «%s»: занятия не добавляются и не исправляются.", animal.Status.Name))
 		}
 		if err = validateInput(&in, animal.DateOfBirth, s.now()); err != nil {
 			return Session{}, err

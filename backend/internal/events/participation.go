@@ -10,6 +10,12 @@ import (
 	"dogclub.local/backend/internal/dogs"
 )
 
+// pedigreeRequired lists the event types where lab 3 requires a pedigree known
+// to three generations; seminars, conferences and forums do not.
+func pedigreeRequired(eventType string) bool {
+	return eventType == "Выставка" || eventType == "Соревнование"
+}
+
 func (s *Service) check(ctx context.Context, q *repository, a scope, e Event, r Registration) (Eligibility, error) {
 	out := Eligibility{CheckedAt: s.now().UTC(), EventVersion: e.Version, BlockingReasons: []string{}}
 	if e.StartsAt == nil || e.EndsAt == nil || e.Timezone == nil || e.Audience == nil {
@@ -77,6 +83,13 @@ func (s *Service) check(ctx context.Context, q *repository, a scope, e Event, r 
 		dog = &v
 	}
 	out.Dog = dog
+	// Lab 3 fn_get_event_admission: inactive dogs are refused for any event type.
+	if dog.Inactive() {
+		out.BlockingReasons = append(out.BlockingReasons, "dog_inactive")
+	}
+	if pedigreeRequired(e.Type.Name) && (dog.PedigreeKnown3 == nil || !*dog.PedigreeKnown3) {
+		out.BlockingReasons = append(out.BlockingReasons, "pedigree_incomplete")
+	}
 	if dog.Identifier.Number == "" {
 		out.BlockingReasons = append(out.BlockingReasons, "identifier_missing")
 	}

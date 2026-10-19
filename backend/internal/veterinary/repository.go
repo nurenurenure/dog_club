@@ -174,6 +174,20 @@ func (q *repository) saveVaccination(ctx context.Context, p auth.Principal, dogI
 	tag, err := q.tx.Exec(ctx, `UPDATE vaccination SET vaccination_date=CASE WHEN vaccination_date::date=$4::date THEN vaccination_date ELSE $4::date END,vaccine_type_id=$5,vaccination_valid_until=$6::date,vaccination_next_date=$7::date,vaccine_snapshot=$8,version=version+1 WHERE dog_id=$1 AND vaccination_id=$2 AND version=$3`, dogID, id, version, in.Date, in.VaccineTypeID, until, next, json.RawMessage(snapshot))
 	return id, changed(tag, err)
 }
+
+// overlappingVaccination finds another valid dose of the product whose window
+// [date, next_date) intersects [date, next). Legacy doses without next_date are ignored.
+func (q *repository) overlappingVaccination(ctx context.Context, dogID, id, typeID int32, date, next string) (string, string, bool, error) {
+	var other, otherNext string
+	err := q.tx.QueryRow(ctx, `SELECT to_char(vaccination_date,'YYYY-MM-DD'),to_char(vaccination_next_date,'YYYY-MM-DD') FROM vaccination WHERE dog_id=$1 AND vaccination_id<>$2 AND vaccine_type_id=$3 AND NOT is_void AND vaccination_next_date IS NOT NULL AND vaccination_date::date<$5::date AND $4::date<vaccination_next_date ORDER BY vaccination_date,vaccination_id LIMIT 1`, dogID, id, typeID, date, next).Scan(&other, &otherNext)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", false, nil
+	}
+	if err != nil {
+		return "", "", false, storageError(err)
+	}
+	return other, otherNext, true, nil
+}
 func (q *repository) clearance(ctx context.Context, dogID int32, id int64) (Clearance, error) {
 	out := Clearance{VaccinationIDs: []int32{}}
 	err := q.tx.QueryRow(ctx, `SELECT c.clearance_id,c.dog_id,c.examination_id,to_char(e.veterinary_examination_date,'YYYY-MM-DD'),c.purpose,c.decision,to_char(c.valid_until,'YYYY-MM-DD'),c.comment,c.recorded_by_user_id,c.recorded_by_profile_id,e.club_member_id,c.version,c.is_void FROM veterinary_clearance c JOIN veterinary_examination e ON e.veterinary_examination_id=c.examination_id AND e.dog_id=c.dog_id WHERE c.dog_id=$1 AND c.clearance_id=$2`, dogID, id).Scan(&out.ID, &out.DogID, &out.ExaminationID, &out.ExaminationDate, &out.Purpose, &out.Decision, &out.ValidUntil, &out.Comment, &out.Author.UserID, &out.Author.ProfileID, &out.Author.MemberID, &out.Version, &out.IsVoid)

@@ -3,6 +3,7 @@ package breeding
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -205,6 +206,76 @@ func (s *Service) Patients(ctx context.Context, p auth.Principal, f dogs.Filter)
 		return s.dogs.ListForBreeding(ctx, q.tx, p, f)
 	})
 }
+func (s *Service) MateCandidates(ctx context.Context, p auth.Principal, dogID int32) (MateCandidates, error) {
+	return with(ctx, s, p, []string{"staff", "expert", "leader"}, func(ctx context.Context, q *repository, p auth.Principal) (MateCandidates, error) {
+		asOf := s.now().UTC().Format(time.DateOnly)
+		out := MateCandidates{DogID: dogID, AsOf: asOf, Candidates: []dogs.Summary{}}
+		target, err := s.dogs.ReadForBreeding(ctx, q.tx, p, dogID)
+		if err != nil {
+			return out, err
+		}
+		if target.Inactive() {
+			return out, invalid("dog_id", fmt.Sprintf("Собака имеет статус «%s»: пара не подбирается.", target.Status.Name))
+		}
+		found, truncated, err := s.dogs.ListMateCandidates(ctx, q.tx, p, target.Summary, asOf, MateCandidateScan)
+		if err != nil {
+			return out, err
+		}
+		out.Truncated = truncated
+		for _, c := range found {
+			ok, err := s.suitableMate(ctx, q, p, target, c.ID, asOf)
+			if err != nil {
+				return out, err
+			}
+			if ok {
+				out.Candidates = append(out.Candidates, c)
+			}
+		}
+		return out, nil
+	})
+}
+
+// suitableMate applies the remaining fn_suggest_mates filters: no close kinship,
+// no confirmed hereditary diagnosis and, for a bitch, readiness for a new litter.
+func (s *Service) suitableMate(ctx context.Context, q *repository, p auth.Principal, target dogs.BreedingAnimal, id int32, asOf string) (bool, error) {
+	candidate, err := s.dogs.ReadForBreeding(ctx, q.tx, p, id)
+	if err != nil {
+		return false, err
+	}
+	female, male := target, candidate
+	if candidate.Sex.Name == "Сука" {
+		female, male = candidate, target
+	}
+	if kinship(female, male) != "" {
+		return false, nil
+	}
+	health, err := s.veterinary.CheckForBreeding(ctx, q.tx, p, id, asOf)
+	if err != nil {
+		return false, err
+	}
+	for _, finding := range health.Findings {
+		if finding.IsHereditary != nil && *finding.IsHereditary {
+			return false, nil
+		}
+	}
+	if candidate.Sex.Name != "Сука" {
+		return true, nil
+	}
+	unresolved, reserved, err := q.occupied(ctx, id, 0, 0)
+	if err != nil || unresolved || reserved {
+		return false, err
+	}
+	birth, err := q.lastBirth(ctx, id, 0)
+	if err != nil || birth == nil {
+		return err == nil, err
+	}
+	// Ready once the litter interval since the previous birth has fully passed.
+	earliest, err := earliestBirth(birth)
+	if err != nil {
+		return false, err
+	}
+	return *earliest <= asOf, nil
+}
 func (s *Service) CreateRequest(ctx context.Context, p auth.Principal, in RequestInput) (Request, error) {
 	if err := validateRequest(&in); err != nil {
 		return Request{}, err
@@ -331,6 +402,27 @@ func commonAncestors(f, m dogs.BreedingAnimal) []int32 {
 	slices.Sort(common)
 	return slices.Compact(common)
 }
+
+// kinship applies lab 3 fn_check_breeding_relatedness within three generations:
+// parent and child, a shared parent, then any shared ancestor. Deeper common
+// ancestors stay a warning for the expert.
+func kinship(f, m dogs.BreedingAnimal) string {
+	if f.Generations[m.ID] == 1 || m.Generations[f.ID] == 1 {
+		return "parent_child"
+	}
+	shared := ""
+	for id, fg := range f.Generations {
+		mg, ok := m.Generations[id]
+		if !ok || fg > dogs.PedigreeGenerations || mg > dogs.PedigreeGenerations || (fg == 0 && mg == 0) {
+			continue
+		}
+		if fg == 1 && mg == 1 {
+			return "shared_parent"
+		}
+		shared = "common_ancestor_3_generations"
+	}
+	return shared
+}
 func (s *Service) assess(ctx context.Context, q *repository, p auth.Principal, r Request, asOf string, breedingID int64) (Assessment, error) {
 	out := Assessment{AsOf: asOf, CommonAncestorIDs: []int32{}, BlockingReasons: []string{}, Warnings: []string{}, IntervalDays: LitterIntervalDays}
 	var err error
@@ -344,6 +436,13 @@ func (s *Service) assess(ctx context.Context, q *repository, p auth.Principal, r
 	}
 	if r.FemaleID == r.MaleID {
 		out.BlockingReasons = append(out.BlockingReasons, "same_dog")
+	}
+	// Lab 3 fn_dog_active_check_breeding: each partner is checked separately.
+	if out.Female.Inactive() {
+		out.BlockingReasons = append(out.BlockingReasons, "female_inactive")
+	}
+	if out.Male.Inactive() {
+		out.BlockingReasons = append(out.BlockingReasons, "male_inactive")
 	}
 	if out.Female.Sex.Name != "Сука" || out.Male.Sex.Name != "Кобель" {
 		out.BlockingReasons = append(out.BlockingReasons, "pair_sex")
@@ -372,6 +471,11 @@ func (s *Service) assess(ctx context.Context, q *repository, p auth.Principal, r
 		out.BlockingReasons = append(out.BlockingReasons, "male_medical_clearance")
 	}
 	out.CommonAncestorIDs = commonAncestors(out.Female, out.Male)
+	if r.FemaleID != r.MaleID {
+		if reason := kinship(out.Female, out.Male); reason != "" {
+			out.BlockingReasons = append(out.BlockingReasons, reason)
+		}
+	}
 	if len(out.CommonAncestorIDs) > 0 {
 		out.Warnings = append(out.Warnings, "known_relationship")
 	}

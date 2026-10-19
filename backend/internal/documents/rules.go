@@ -28,7 +28,7 @@ func text(s string, max int) bool {
 	return utf8.ValidString(s) && utf8.RuneCountInString(s) <= max && !strings.ContainsFunc(s, unicode.IsControl)
 }
 func date(s string) bool { t, e := time.Parse(time.DateOnly, s); return e == nil && t.Year() > 0 }
-func validate(in *Input) error {
+func validate(in *Input, today string) error {
 	if in.BreedingDecisionID != nil && (*in.BreedingDecisionID < 1 || in.LitterID != nil) || in.LitterID != nil && *in.LitterID < 1 {
 		return invalid("basis", "Укажите одно положительное племенное основание.")
 	}
@@ -49,6 +49,10 @@ func validate(in *Input) error {
 		if d != nil && !date(*d) {
 			return invalid("date", "Укажите дату YYYY-MM-DD.")
 		}
+	}
+	// Lab 3 fn_document_dates_check: a document cannot be issued in the future.
+	if in.IssueDate != nil && *in.IssueDate > today {
+		return invalid("issue_date", "Дата выдачи не может быть в будущем.")
 	}
 	if in.ExpiresOn != nil && in.IssueDate != nil && *in.ExpiresOn < *in.IssueDate {
 		return invalid("expires_on", "Окончание не может быть раньше выдачи.")

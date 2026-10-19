@@ -316,10 +316,9 @@ func TestVaccinationReplacementStagesAndCorrection(t *testing.T) {
 	if f.count(t, "vaccination", "sent") != 4 {
 		t.Fatal("daily overdue spam")
 	}
-	// Later dose with the same product supersedes even if it is then voided.
-	newer, err := f.v.CreateVaccination(f.ctx, f.vet, f.dog.ID, veterinary.VaccinationInput{Date: date, VaccineTypeID: b.ID})
-	f.must(t, err)
-	_, err = f.v.Void(f.ctx, f.vet, f.dog.ID, "vaccination", int64(newer.ID), veterinary.CorrectionInput{Version: newer.Version, Reason: "Synthetic cancellation"})
+	// Later dose with the same product supersedes even if it is then voided. Lab 3
+	// forbids overlapping doses through the API, so this one is a voided legacy row.
+	_, err = f.pool.Exec(f.ctx, `INSERT INTO vaccination(dog_id,vaccination_date,vaccination_next_date,vaccine_type_id,is_void) VALUES($1,$2::date,$2::date+8,$3,true)`, f.dog.ID, date, b.ID)
 	f.must(t, err)
 	f.tick(t)
 	if f.count(t, "vaccination", "sent") != 4 {
@@ -474,7 +473,14 @@ func (f *fixture) newEvent(t *testing.T, name string, start time.Time, classes b
 	f.must(t, err)
 	dict, err := f.e.Dictionaries(f.ctx, f.staff)
 	f.must(t, err)
-	e, err := f.e.CreateEvent(f.ctx, f.staff, events.EventInput{Name: name, TypeID: dict.Types[0].ID, VenueID: venue.ID, StartsAt: start, EndsAt: start.Add(time.Hour), Timezone: "Asia/Barnaul", Audience: "mixed", UsesClasses: classes})
+	// A lesson: shows and competitions also require a three-generation pedigree (lab 3).
+	var lesson int32
+	for _, x := range dict.Types {
+		if x.Name == "Занятие" {
+			lesson = x.ID
+		}
+	}
+	e, err := f.e.CreateEvent(f.ctx, f.staff, events.EventInput{Name: name, TypeID: lesson, VenueID: venue.ID, StartsAt: start, EndsAt: start.Add(time.Hour), Timezone: "Asia/Barnaul", Audience: "mixed", UsesClasses: classes})
 	f.must(t, err)
 	e, err = f.e.SetExperts(f.ctx, f.staff, e.ID, events.ExpertsInput{Correction: events.Correction{Version: e.Version, Reason: "Assign synthetic expert"}, ProfileIDs: []string{f.expert.Profile.ID}})
 	f.must(t, err)
@@ -638,7 +644,9 @@ func TestLegacyCompositeVaccinationIDsStaySeparate(t *testing.T) {
 	_, err := f.pool.Exec(f.ctx, `INSERT INTO vaccination(vaccination_id,dog_id,vaccination_date,vaccination_next_date,vaccine_type_id) VALUES($1,$2,$4,$5,$6),($1,$3,$4,$5,$6)`, sameID, f.dog.ID, f.second.ID, date, next, vaccine.ID)
 	f.must(t, err)
 	// Replace only the first dog's old record; the other dog's same ID remains due.
-	_, err = f.v.CreateVaccination(f.ctx, f.vet, f.dog.ID, veterinary.VaccinationInput{Date: f.now.AddDate(0, 0, -1).Format(time.DateOnly), VaccineTypeID: vaccine.ID, ReplacesVaccinationIDs: []int32{sameID}})
+	// Another product: lab 3 forbids a second dose while the first is current.
+	successor := f.vaccine(t, "Synthetic composite-key successor")
+	_, err = f.v.CreateVaccination(f.ctx, f.vet, f.dog.ID, veterinary.VaccinationInput{Date: f.now.AddDate(0, 0, -1).Format(time.DateOnly), VaccineTypeID: successor.ID, ReplacesVaccinationIDs: []int32{sameID}})
 	f.must(t, err)
 	f.tick(t)
 	if f.count(t, "vaccination", "sent") != 2 {

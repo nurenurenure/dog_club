@@ -302,7 +302,7 @@ func (s *Service) references(ctx context.Context, q *repository, p auth.Principa
 }
 func (s *Service) Create(ctx context.Context, p auth.Principal, in Input) (Document, error) {
 	var d Document
-	if err := validate(&in); err != nil {
+	if err := validate(&in, s.now().UTC().Format(time.DateOnly)); err != nil {
 		return d, err
 	}
 	err := s.with(ctx, p, []string{"staff", "veterinarian"}, func(ctx context.Context, q *repository, p auth.Principal) error {
@@ -336,7 +336,7 @@ func writeAllowed(p auth.Principal, d Document) error {
 func same(a, b *int32) bool { return a == nil && b == nil || a != nil && b != nil && *a == *b }
 func (s *Service) Update(ctx context.Context, p auth.Principal, id int32, in Update) (Document, error) {
 	var d Document
-	if err := validate(&in.Input); err != nil {
+	if err := validate(&in.Input, s.now().UTC().Format(time.DateOnly)); err != nil {
 		return d, err
 	}
 	if err := correction(&in.Correction); err != nil {

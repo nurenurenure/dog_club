@@ -71,6 +71,10 @@
 - `POST /dogs/{dogID}/training-sessions/{sessionID}/void` — отмена ошибочной записи.
 - `GET /dogs/{dogID}/training-sessions/{sessionID}/history` — история записи.
 
+Для собаки с неактивным статусом создание и исправление занятия отклоняются
+с 422 по полю dog_id (лаб. 3, fn_dog_active_check); отмена ошибочной записи
+остаётся доступна.
+
 Пример факта без связи с мероприятием:
 
 ```json

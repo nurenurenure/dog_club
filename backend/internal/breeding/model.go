@@ -24,6 +24,16 @@ func invalid(field, message string) error { return &ValidationError{[]FieldError
 
 const LitterIntervalDays = 365
 
+// MateCandidateScan bounds the automatic checks of one suggestion request.
+const MateCandidateScan = 500
+
+// MateCandidates is lab 3 fn_suggest_mates: dogs passing every automatic filter.
+type MateCandidates struct {
+	DogID      int32          `json:"dog_id"`
+	AsOf       string         `json:"as_of"`
+	Candidates []dogs.Summary `json:"candidates"`
+	Truncated  bool           `json:"truncated"`
+}
 type Assessment struct {
 	AsOf              string                    `json:"as_of"`
 	Female            dogs.BreedingAnimal       `json:"female"`

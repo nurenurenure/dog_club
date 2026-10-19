@@ -24,6 +24,14 @@ func (h *Handler) RegisterRoutes(router chi.Router) {
 	router.Group(func(r chi.Router) {
 		r.Use(httpapi.Protect, h.account.RequireAccount)
 		r.Get("/breeding/dogs", h.patients)
+		r.Get("/breeding/dogs/{dogID}/mate-candidates", func(w http.ResponseWriter, r *http.Request) {
+			id, ok := pathID(w, r, "dogID")
+			if !ok {
+				return
+			}
+			out, err := h.service.MateCandidates(r.Context(), auth.PrincipalFrom(r), int32(id))
+			respond(w, r, out, err)
+		})
 		for _, e := range []struct{ path, entity string }{{"breeding-requests", "request"}, {"breedings", "breeding"}, {"litters", "litter"}} {
 			r.Get("/"+e.path, func(w http.ResponseWriter, r *http.Request) {
 				f, ok := filter(w, r)

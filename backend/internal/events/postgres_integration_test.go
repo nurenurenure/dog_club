@@ -119,14 +119,47 @@ func TestPostgresEventsLifecycleAccessAndContracts(t *testing.T) {
 		must(err)
 		return dog
 	}
+	sex := map[string]int32{}
+	for _, x := range dict.Sexes {
+		sex[x.Name] = x.ID
+	}
+	// knownPedigree records card parents and grandparents with external
+	// great-grandparents: lab 3 admission to shows and competitions.
+	knownPedigree := func(child dogs.Dog) dogs.Dog {
+		t.Helper()
+		ancestor := func(suffix, name string, birth string, mother, father *dogs.ParentInput) *dogs.ParentInput {
+			x, err := d.Create(ctx, staff, dogs.CreateInput{Nickname: child.Nickname + suffix, DateOfBirth: birth, Identifier: dogs.IdentifierInput{TypeID: dict.IdentifierTypes[0].ID, Number: child.Identifier.Number + suffix}, StatusID: dict.Statuses[0].ID, BreedID: child.Breed.ID, CoatColorID: dict.CoatColors[0].ID, SexID: sex[name], OwnerIDs: []int32{person.ID}})
+			must(err)
+			_, err = d.SetPedigree(ctx, staff, x.ID, dogs.PedigreeInput{Version: x.Version, Mother: mother, Father: father})
+			must(err)
+			return &dogs.ParentInput{DogID: &x.ID}
+		}
+		external := func() *dogs.ParentInput {
+			return &dogs.ParentInput{External: &dogs.ExternalParent{Nickname: "Внешний предок", PedigreeNumber: "EXT", Issuer: "Клуб"}}
+		}
+		grand := func(suffix, name string) *dogs.ParentInput {
+			return ancestor(suffix, name, "2015-01-01", external(), external())
+		}
+		mother := ancestor("-M", "Сука", "2019-01-01", grand("-MM", "Сука"), grand("-MF", "Кобель"))
+		father := ancestor("-F", "Кобель", "2019-01-01", grand("-FM", "Сука"), grand("-FF", "Кобель"))
+		out, err := d.SetPedigree(ctx, staff, child.ID, dogs.PedigreeInput{Version: child.Version, Mother: mother, Father: father})
+		must(err)
+		return out
+	}
 	dog := newDog("EVENT-0001", "2023-03-01", person.ID)
 	young := newDog("EVENT-0002", "2023-03-02", other.ID)
 	product, err := v.CreateVaccineType(ctx, vet, veterinary.VaccineTypeInput{Name: "Synthetic event fixture product", Validity: veterinary.Period{Value: 24, Unit: "months"}, Revaccination: veterinary.Period{Value: 12, Unit: "months"}})
 	must(err)
+	doses := map[int32]veterinary.Vaccination{}
 	health := func(id int32, examDate, until string) veterinary.Clearance {
 		t.Helper()
-		dose, err := v.CreateVaccination(ctx, vet, id, veterinary.VaccinationInput{Date: "2023-03-03", VaccineTypeID: product.ID})
-		must(err)
+		// A repeated clearance reuses the still valid dose: lab 3 forbids overlapping ones.
+		dose, ok := doses[id]
+		if !ok {
+			dose, err = v.CreateVaccination(ctx, vet, id, veterinary.VaccinationInput{Date: "2023-03-03", VaccineTypeID: product.ID})
+			must(err)
+			doses[id] = dose
+		}
 		exam, err := v.CreateExamination(ctx, vet, id, veterinary.ExaminationInput{Date: examDate, Result: "PRIVATE_EVENT_CLINICAL_PROSE"})
 		must(err)
 		clearance, err := v.CreateClearance(ctx, vet, id, veterinary.ClearanceInput{ExaminationID: exam.ID, Purpose: "events", Decision: "allowed", ValidUntil: ptr(until), VaccinationIDs: []int32{dose.ID}})
@@ -184,6 +217,10 @@ func TestPostgresEventsLifecycleAccessAndContracts(t *testing.T) {
 	if registration.Eligibility == nil || !slices.Contains(registration.Eligibility.BlockingReasons, "medical_clearance") {
 		t.Fatal("medical clearance did not cover whole unscheduled period")
 	}
+	if !slices.Contains(registration.Eligibility.BlockingReasons, "pedigree_incomplete") {
+		t.Fatal("show admitted a dog without a three-generation pedigree")
+	}
+	dog = knownPedigree(dog)
 	_, err = s.CreateRegistration(ctx, staff, e.ID, registration.RegistrationInput)
 	expect(err, ErrConflict)
 	_, err = s.CreateRegistration(ctx, owner, e.ID, registration.RegistrationInput)
@@ -393,6 +430,51 @@ func TestPostgresEventsLifecycleAccessAndContracts(t *testing.T) {
 		}
 		return nil
 	}))
+	// Lab 3 admission: inactive dogs are refused for any type; only shows and
+	// competitions require the three-generation pedigree.
+	var lostStatus, lessonType int32
+	for _, x := range dict.Statuses {
+		if x.Name == "Потеряна" {
+			lostStatus = x.ID
+		}
+	}
+	for _, x := range types.Types {
+		if x.Name == "Занятие" {
+			lessonType = x.ID
+		}
+	}
+	lostDog := newDog("LOST-EVENT-DOG", "2023-03-01", person.ID)
+	lostDog, err = d.Patch(ctx, staff, lostDog.ID, dogs.PatchInput{Version: lostDog.Version, StatusID: dogs.Field[int32]{Set: true, Value: &lostStatus}})
+	must(err)
+	lesson := newEvent("Lab lesson", "mixed", lessonType, false)
+	admission := func(event Event, dogID int32, classID *int64) []string {
+		t.Helper()
+		var reasons []string
+		must(a.WithAccess(ctx, staff, []string{"staff"}, func(ctx context.Context, tx pgx.Tx, p auth.Principal) error {
+			eligibility, err := s.check(ctx, &repository{tx: tx}, scope{p: p}, event, Registration{RegistrationInput: RegistrationInput{MemberID: person.ID, DogID: &dogID, ClassID: classID}})
+			reasons = eligibility.BlockingReasons
+			return err
+		}))
+		return reasons
+	}
+	if reasons := admission(boundaryEvent, lostDog.ID, &class.ID); !slices.Contains(reasons, "dog_inactive") || !slices.Contains(reasons, "pedigree_incomplete") {
+		t.Fatalf("lost dog admitted to a show: %v", reasons)
+	}
+	if reasons := admission(lesson, lostDog.ID, nil); !slices.Contains(reasons, "dog_inactive") || slices.Contains(reasons, "pedigree_incomplete") {
+		t.Fatalf("lesson admission rules: %v", reasons)
+	}
+	if reasons := admission(lesson, boundaryDog.ID, nil); slices.Contains(reasons, "dog_inactive") || slices.Contains(reasons, "pedigree_incomplete") {
+		t.Fatalf("active dog without pedigree refused a lesson: %v", reasons)
+	}
+	// A pedigree document alone is enough for a show, without ancestor cards.
+	if reasons := admission(boundaryEvent, boundaryDog.ID, &class.ID); !slices.Contains(reasons, "pedigree_incomplete") {
+		t.Fatalf("show admitted a dog without pedigree: %v", reasons)
+	}
+	boundaryDog, err = d.SetPedigree(ctx, staff, boundaryDog.ID, dogs.PedigreeInput{Version: boundaryDog.Version, Number: "EVENT-PEDIGREE-1", Issuer: "Кинологическая организация"})
+	must(err)
+	if reasons := admission(boundaryEvent, boundaryDog.ID, &class.ID); slices.Contains(reasons, "pedigree_incomplete") {
+		t.Fatalf("pedigree document not accepted for a show: %v", reasons)
+	}
 	// Real handlers: all schemas compiled against the full OpenAPI 3.1 document.
 	doc, err := openapi3.NewLoader().LoadFromFile("../../api/openapi.yaml")
 	must(err)

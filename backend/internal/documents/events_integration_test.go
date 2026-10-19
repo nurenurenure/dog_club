@@ -147,7 +147,14 @@ func TestEventDocumentFormsAndRevocation(t *testing.T) {
 	edict, err := eService.Dictionaries(ctx, staff)
 	must(err)
 	parse := func(raw string) time.Time { v, err := time.Parse(time.RFC3339, raw); must(err); return v }
-	event, err := eService.CreateEvent(ctx, staff, events.EventInput{Name: "Клубная выставка", TypeID: edict.Types[0].ID, VenueID: venue.ID, StartsAt: parse("2024-03-01T00:30:00+07:00"), EndsAt: parse("2024-03-01T18:00:00+07:00"), Timezone: "Asia/Barnaul", Audience: "mixed", UsesClasses: true})
+	// A lesson: shows and competitions also require a three-generation pedigree (lab 3).
+	var lesson int32
+	for _, x := range edict.Types {
+		if x.Name == "Занятие" {
+			lesson = x.ID
+		}
+	}
+	event, err := eService.CreateEvent(ctx, staff, events.EventInput{Name: "Клубное занятие", TypeID: lesson, VenueID: venue.ID, StartsAt: parse("2024-03-01T00:30:00+07:00"), EndsAt: parse("2024-03-01T18:00:00+07:00"), Timezone: "Asia/Barnaul", Audience: "mixed", UsesClasses: true})
 	must(err)
 	event, err = eService.SetExperts(ctx, staff, event.ID, events.ExpertsInput{Correction: events.Correction{Version: event.Version, Reason: "Назначение"}, ProfileIDs: []string{expert.Profile.ID}})
 	must(err)

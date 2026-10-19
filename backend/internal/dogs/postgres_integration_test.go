@@ -113,7 +113,15 @@ func TestPostgresDogLifecycleAndPermissions(t *testing.T) {
 	}
 	female := lookup(dictionaries.Sexes, "Сука")
 	male := lookup(dictionaries.Sexes, "Кобель")
-	onBook := lookup(dictionaries.Statuses, "На учёте")
+	onBook := int32(0)
+	for _, v := range dictionaries.Statuses {
+		if v.Name == "На учёте" && v.IsActive {
+			onBook = v.ID
+		}
+	}
+	if onBook == 0 {
+		t.Fatal("active dog status missing")
+	}
 	base := func(name, birth, number string, sex, ownerID int32) CreateInput {
 		return CreateInput{Nickname: name, DateOfBirth: birth, Identifier: IdentifierInput{TypeID: dictionaries.IdentifierTypes[0].ID, Number: number}, StatusID: onBook, BreedID: dictionaries.Breeds[0].ID, CoatColorID: dictionaries.CoatColors[0].ID, SexID: sex, OwnerIDs: []int32{ownerID}}
 	}

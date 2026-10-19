@@ -19,6 +19,20 @@ type EventAnimal struct {
 	PedigreeNumber string  `json:"pedigree_number"`
 	PedigreeIssuer string  `json:"pedigree_issuer"`
 	Titles         []Title `json:"titles"`
+	PedigreeKnown3 *bool   `json:"pedigree_known_3_generations,omitempty"`
+}
+
+func (q *repository) eventAnimal(ctx context.Context, id int32) (EventAnimal, error) {
+	d, err := q.card(ctx, id)
+	if err != nil {
+		return EventAnimal{}, err
+	}
+	a, err := q.ancestry(ctx, id, d.Pedigree, PedigreeGenerations)
+	if err != nil {
+		return EventAnimal{}, err
+	}
+	known := pedigreeKnown(d.Pedigree, a)
+	return EventAnimal{d.Summary, d.Pedigree.Number, d.Pedigree.Issuer, d.Titles, &known}, nil
 }
 
 // ReadForEvents is limited to an already authorized event transaction.
@@ -29,11 +43,7 @@ func (s *Service) ReadForEvents(ctx context.Context, tx pgx.Tx, p auth.Principal
 	if err := s.readAccess(ctx, tx, p, id); err != nil {
 		return EventAnimal{}, err
 	}
-	d, err := (&repository{tx}).card(ctx, id)
-	if err != nil {
-		return EventAnimal{}, err
-	}
-	return EventAnimal{d.Summary, d.Pedigree.Number, d.Pedigree.Issuer, d.Titles}, nil
+	return (&repository{tx}).eventAnimal(ctx, id)
 }
 func (s *Service) ValidateEventRepresentative(ctx context.Context, tx pgx.Tx, p auth.Principal, dogID, memberID int32) error {
 	if err := auth.RequireProfile(p, "staff", "expert", "leader", "owner"); err != nil {
