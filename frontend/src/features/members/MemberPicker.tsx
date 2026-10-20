@@ -16,10 +16,11 @@ interface MemberPickerProps {
   value: PickedMember[];
   onChange: (value: PickedMember[]) => void;
   error?: string;
+  hint?: string;
 }
 
 /** Several club members, e.g. the owners of a dog: search, add, remove. */
-export function MemberPicker({ label, value, onChange, error }: MemberPickerProps) {
+export function MemberPicker({ label, value, onChange, error, hint = 'ФИО члена клуба. Можно выбрать несколько.' }: MemberPickerProps) {
   const [query, setQuery] = useState('');
   const q = useDebounced(query.trim());
   const members = useMembers({ q, limit: 10 }, q.length > 0);
@@ -47,7 +48,7 @@ export function MemberPicker({ label, value, onChange, error }: MemberPickerProp
         onQuery={setQuery}
         loading={members.isFetching || q !== query.trim()}
         error={error}
-        hint="ФИО члена клуба. Можно выбрать несколько."
+        hint={hint}
         items={found?.map((member) => ({
           id: member.id,
           title: member.full_name,

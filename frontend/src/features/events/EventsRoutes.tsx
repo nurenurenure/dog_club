@@ -3,6 +3,7 @@ import { NotFound, StaffOnly } from '../sections/SectionPage';
 import { EventCreatePage, EventEditPage } from './EventFormPage';
 import { EventPage } from './EventPage';
 import { EventsPage } from './EventsPage';
+import { RegistrationPage } from './RegistrationPage';
 
 export function EventsRoutes() {
   return (
@@ -25,6 +26,7 @@ export function EventsRoutes() {
           </StaffOnly>
         }
       />
+      <Route path=":eventID/registrations/:registrationID" element={<RegistrationPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

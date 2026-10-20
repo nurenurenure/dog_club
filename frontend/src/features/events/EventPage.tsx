@@ -7,6 +7,8 @@ import { audiences } from './labels';
 import { OverviewTab } from './OverviewTab';
 import { EventHistory, EventStatusChip } from './parts';
 import { ProgramTab, editable } from './ProgramTab';
+import { RegistrationsTab } from './RegistrationsTab';
+import { ResultsTab } from './ResultsTab';
 import { venueAddress } from './VenuesTab';
 import { formatPeriod, zoneCaption } from './zonedTime';
 import styles from './events.module.css';
@@ -14,6 +16,8 @@ import styles from './events.module.css';
 const allTabs = [
   { value: 'overview', label: 'Обзор' },
   { value: 'program', label: 'Программа' },
+  { value: 'participants', label: 'Участники' },
+  { value: 'results', label: 'Результаты' },
   { value: 'history', label: 'История' },
 ] as const;
 type Tab = (typeof allTabs)[number]['value'];
@@ -27,8 +31,11 @@ export function EventPage() {
 
 function EventCard({ event, onReload }: { event: Event; onReload: () => void }) {
   const { profile } = useSession();
-  // An owner reads only the history of own entries, not of the whole event.
-  const tabs = allTabs.filter((item) => item.value !== 'history' || profile.role !== 'owner');
+  // An owner sees own entries only and reads their history there, not the history of the event.
+  const owner = profile.role === 'owner';
+  const tabs = allTabs
+    .filter((item) => item.value !== 'history' || !owner)
+    .map((item) => (owner && item.value === 'participants' ? { ...item, label: 'Мои записи' } : owner && item.value === 'results' ? { ...item, label: 'Мои результаты' } : item));
   const [params, setParams] = useSearchParams();
   const tab: Tab = tabs.find((item) => item.value === params.get('tab'))?.value ?? 'overview';
   const venue = event.venue;
@@ -83,6 +90,8 @@ function EventCard({ event, onReload }: { event: Event; onReload: () => void }) 
       <section {...tabPanelProps('event', tab)} className={styles.panel}>
         {tab === 'overview' && <OverviewTab event={event} onReload={onReload} />}
         {tab === 'program' && <ProgramTab event={event} onReload={onReload} />}
+        {tab === 'participants' && <RegistrationsTab event={event} onReload={onReload} />}
+        {tab === 'results' && <ResultsTab event={event} onReload={onReload} />}
         {tab === 'history' && <EventHistory target={{ kind: 'event', eventID: event.id }} />}
       </section>
     </>
