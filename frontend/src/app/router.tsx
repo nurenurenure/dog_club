@@ -3,6 +3,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { AccountPage } from '../features/account/AccountPage';
 import { BreedingRoutes } from '../features/breeding/BreedingRoutes';
 import { DogsRoutes } from '../features/dogs/DogsRoutes';
+import { EventsRoutes } from '../features/events/EventsRoutes';
 import { OwnCardPage } from '../features/members/MemberPage';
 import { MembersRoutes } from '../features/members/MembersRoutes';
 import { PatientsRoutes } from '../features/veterinary/PatientsRoutes';
@@ -44,6 +45,7 @@ const screens: Partial<Record<SectionKey, React.ReactNode>> = {
   patients: <PatientsRoutes />,
   vaccines: <VaccinesPage />,
   breeding: <BreedingRoutes />,
+  events: <EventsRoutes />,
 };
 
 const sectionRoutes = (Object.keys(sections) as SectionKey[]).map((key) => ({
