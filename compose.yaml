@@ -57,6 +57,24 @@ services:
     depends_on:
       db:
         condition: service_healthy
+  web:
+    image: ${DOGCLUB_WEB_IMAGE:-dogclub-web:local}
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: runtime
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8081}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: "no"
+  web-checks:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: checks
   mailpit:
     image: axllent/mailpit:v1.31.6
     ports:

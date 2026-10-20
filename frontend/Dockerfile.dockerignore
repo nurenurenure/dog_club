@@ -1,0 +1,6 @@
+*
+!backend/api/openapi.yaml
+!frontend/
+frontend/node_modules
+frontend/dist
+frontend/src/api/schema.d.ts

@@ -1,0 +1,5 @@
+node_modules/
+dist/
+coverage/
+# Generated from backend/api/openapi.yaml by npm run api:types.
+src/api/schema.d.ts

@@ -1,0 +1,91 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 48px;
+  padding: 0 var(--space-6);
+  border: 0;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  font-size: 16px;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.large {
+  height: 56px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.small {
+  height: 40px;
+  padding: 0 var(--space-4);
+  font-size: 15px;
+}
+
+.block {
+  width: 100%;
+}
+
+.primary {
+  background: var(--pink);
+  color: var(--white);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--pink-deep);
+  color: var(--white);
+}
+
+.save {
+  background: var(--ink);
+  color: var(--cream);
+}
+
+.save:hover:not(:disabled) {
+  background: var(--forest);
+  color: var(--cream);
+}
+
+.accent {
+  background: var(--lime);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.secondary {
+  background: transparent;
+  color: var(--ink);
+  border: 2px solid var(--ink);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--sand);
+}
+
+.link {
+  height: auto;
+  padding: 0;
+  background: none;
+  color: var(--pink-deep);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.danger {
+  height: auto;
+  padding: 0;
+  background: none;
+  color: var(--pink-deep);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}

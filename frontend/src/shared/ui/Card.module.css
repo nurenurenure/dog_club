@@ -1,0 +1,29 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-6);
+  border: var(--border);
+  border-radius: var(--radius-card);
+  background: var(--paper);
+}
+
+.forest {
+  border: 0;
+  background: var(--forest);
+  color: var(--cream);
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+@media (max-width: 599px) {
+  .card {
+    padding: var(--space-4);
+    border-radius: 20px;
+  }
+}

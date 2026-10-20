@@ -1,0 +1,49 @@
+/* Design tokens from ai_context/design_spec.md (palette of ref3). */
+:root {
+  --forest: #2d7444;
+  --forest-deep: #24583a;
+  --forest-line: #3e6b4b;
+  --ink: #1a4a2a;
+  --lime: #9dbe0e;
+  --lime-soft: #dde9a6;
+  --lime-light: #c7dd5a;
+  --lime-tint: #e9f0c9;
+  --cream: #f4edd8;
+  --paper: #fbf7ea;
+  --white: #ffffff;
+  --sand: #e6dcbc;
+  --line: #d9d0b4;
+  --field-line: #b9ae8c;
+  --pink: #e0247f;
+  --pink-deep: #b8165f;
+  --pink-darker: #8e0f48;
+  --pink-soft: #fbd3e5;
+  --sun: #f2c230;
+  --sun-ink: #3d2e00;
+  --text: #15301e;
+  --text-muted: #4f6555;
+
+  --font-display: 'Fira Sans Extra Condensed', 'Arial Narrow', sans-serif;
+  --font-body: 'Onest', system-ui, sans-serif;
+
+  --radius-field: 14px;
+  --radius-table: 16px;
+  --radius-card: 24px;
+  --radius-promo: 32px;
+  --radius-pill: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  --border: 1.5px solid var(--line);
+  --sidebar-width: 264px;
+  --content-max: 1200px;
+  --focus: 0 0 0 3px var(--paper), 0 0 0 6px var(--pink-deep);
+}

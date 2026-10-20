@@ -1,0 +1,42 @@
+{
+  "name": "dogclub-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20",
+    "npm": ">=11.19"
+  },
+  "scripts": {
+    "dev": "npm run api:types && vite",
+    "build": "npm run api:types && tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "npm run api:types && tsc",
+    "test": "npm run api:types && vitest run",
+    "api:types": "openapi-typescript ../backend/api/openapi.yaml -o src/api/schema.d.ts"
+  },
+  "dependencies": {
+    "@fontsource/fira-sans-extra-condensed": "5.1.0",
+    "@fontsource/onest": "5.1.0",
+    "@tanstack/react-query": "5.59.16",
+    "lucide-react": "0.453.0",
+    "openapi-fetch": "0.13.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router": "7.18.2"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "10.4.0",
+    "@testing-library/react": "16.0.1",
+    "@testing-library/user-event": "14.5.2",
+    "@types/node": "24.19.0",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "5.2.0",
+    "jsdom": "27.4.0",
+    "openapi-typescript": "7.4.2",
+    "typescript": "5.6.3",
+    "vite": "7.3.6",
+    "vitest": "4.1.11"
+  }
+}

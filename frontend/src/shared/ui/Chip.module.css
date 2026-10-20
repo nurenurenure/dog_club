@@ -1,0 +1,49 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lime {
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.sun {
+  background: var(--sun);
+  color: var(--sun-ink);
+}
+
+.pink {
+  background: var(--pink);
+  color: var(--white);
+}
+
+.ink {
+  background: var(--ink);
+  color: var(--cream);
+}
+
+.sand {
+  background: var(--sand);
+  color: var(--text);
+}
+
+.dashed {
+  background: transparent;
+  color: var(--text);
+  border: 1.5px dashed var(--field-line);
+}
+
+.struck {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}

@@ -1,0 +1,38 @@
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--sand);
+}
+
+.tab {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab[aria-selected='true'] {
+  background: var(--ink);
+  color: var(--cream);
+}
+
+/* Narrow screens: widths follow the labels so long ones are not truncated. */
+@media (max-width: 419px) {
+  .tab {
+    flex-basis: auto;
+    padding: 0 6px;
+    font-size: 13px;
+  }
+}
