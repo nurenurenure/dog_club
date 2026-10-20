@@ -7,6 +7,7 @@ import { DogsRoutes } from '../features/dogs/DogsRoutes';
 import { EventsRoutes } from '../features/events/EventsRoutes';
 import { OwnCardPage } from '../features/members/MemberPage';
 import { MembersRoutes } from '../features/members/MembersRoutes';
+import { ReportsPage } from '../features/reports/ReportsPage';
 import { TrainingRoutes } from '../features/training/TrainingRoutes';
 import { PatientsRoutes } from '../features/veterinary/PatientsRoutes';
 import { VaccinesPage } from '../features/veterinary/VaccinesPage';
@@ -50,6 +51,7 @@ const screens: Partial<Record<SectionKey, React.ReactNode>> = {
   events: <EventsRoutes />,
   training: <TrainingRoutes />,
   documents: <DocumentsRoutes />,
+  reports: <ReportsPage />,
 };
 
 const sectionRoutes = (Object.keys(sections) as SectionKey[]).map((key) => ({
