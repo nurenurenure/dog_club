@@ -35,7 +35,7 @@ describe('dogs catalogue', () => {
       'GET /api/v1/dogs/7': () => json(dog()),
       'GET /api/v1/dogs/5': () => json(dog({ id: 5, nickname: 'Граф', pedigree: { number: '', issuer: '', father: null, mother: null } })),
     });
-    renderApp('/dogs/7');
+    renderApp('/dogs/7?tab=pedigree');
     expect(await screen.findByRole('heading', { name: 'Бублик' })).toBeTruthy();
     expect(screen.getByText('Известна на 3 поколения')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Граф' })).toBeTruthy();
@@ -83,7 +83,7 @@ describe('dog card', () => {
       'PUT /api/v1/dogs/7/pedigree': () => json(dog({ version: 5 })),
       'GET /api/v1/members/3': () => json(member()),
     });
-    renderApp('/dogs/7');
+    renderApp('/dogs/7?tab=pedigree');
     await userEvent.click(await screen.findByRole('button', { name: 'Изменить' }));
     const mother = screen.getByRole('group', { name: 'Мать' });
     await userEvent.click(within(mother).getByRole('tab', { name: 'Собака клуба' }));

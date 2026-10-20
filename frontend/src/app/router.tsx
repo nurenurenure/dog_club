@@ -4,6 +4,8 @@ import { AccountPage } from '../features/account/AccountPage';
 import { DogsRoutes } from '../features/dogs/DogsRoutes';
 import { OwnCardPage } from '../features/members/MemberPage';
 import { MembersRoutes } from '../features/members/MembersRoutes';
+import { PatientsRoutes } from '../features/veterinary/PatientsRoutes';
+import { VaccinesPage } from '../features/veterinary/VaccinesPage';
 import { LoginPage, type LoginNotice } from '../features/auth/LoginPage';
 import { NoAccess, NotFound, SectionPlaceholder } from '../features/sections/SectionPage';
 import { Shell } from '../shared/layout/Shell';
@@ -38,6 +40,8 @@ const screens: Partial<Record<SectionKey, React.ReactNode>> = {
   dogs: <DogsRoutes />,
   members: <MembersRoutes />,
   card: <OwnCardPage />,
+  patients: <PatientsRoutes />,
+  vaccines: <VaccinesPage />,
 };
 
 const sectionRoutes = (Object.keys(sections) as SectionKey[]).map((key) => ({

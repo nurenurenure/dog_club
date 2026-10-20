@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router';
 import { useSession } from '../../auth/AuthProvider';
 import { formatAge, formatDate, pluralize, todayUTC } from '../../shared/format';
 import { Alert, Button, ButtonLink, Chip, Fact, Facts, Loading, QueryError, ReasonDialog, Tabs, TextField, tabPanelProps } from '../../shared/ui';
+import { HealthTab } from '../veterinary/HealthTab';
 import { DogHistoryTab } from './DogHistoryTab';
 import { dogsApi, isActiveStatus, useDog, useDogDictionaries, useDogSaved, type Dog } from './dogsApi';
 import { OwnersTab } from './OwnersTab';
@@ -11,8 +12,9 @@ import { PedigreeTab } from './PedigreeTab';
 import { TitlesTab } from './TitlesTab';
 import styles from './dogs.module.css';
 
-// Health, documents and events join the card on their own steps of the plan.
+// Documents and events join the card on their own steps of the plan.
 const tabs = [
+  { value: 'health', label: 'Здоровье' },
   { value: 'pedigree', label: 'Родословная' },
   { value: 'titles', label: 'Титулы' },
   { value: 'owners', label: 'Владельцы' },
@@ -34,7 +36,7 @@ function DogCard({ dog, onReload }: { dog: Dog; onReload: () => void }) {
   const dictionaries = useDogDictionaries();
   const active = isActiveStatus(dictionaries.data, dog.status.id);
   const [params, setParams] = useSearchParams();
-  const tab: Tab = tabs.find((item) => item.value === params.get('tab'))?.value ?? 'pedigree';
+  const tab: Tab = tabs.find((item) => item.value === params.get('tab'))?.value ?? 'health';
   const [registration, setRegistration] = useState(false);
   const age = formatAge(dog.date_of_birth);
 
@@ -99,8 +101,9 @@ function DogCard({ dog, onReload }: { dog: Dog; onReload: () => void }) {
         <Fact label="Версия карточки" value={dog.version} />
       </Facts>
 
-      <Tabs label="Разделы карточки" idPrefix="dog" value={tab} options={tabs} onChange={(value) => setParams(value === 'pedigree' ? {} : { tab: value }, { replace: true })} />
+      <Tabs label="Разделы карточки" idPrefix="dog" value={tab} options={tabs} onChange={(value) => setParams(value === 'health' ? {} : { tab: value }, { replace: true })} />
       <section {...tabPanelProps('dog', tab)} className={styles.panel}>
+        {tab === 'health' && <HealthTab dogID={dog.id} birth={dog.date_of_birth} active={active} />}
         {tab === 'pedigree' && <PedigreeTab dog={dog} onReload={onReload} />}
         {tab === 'titles' && <TitlesTab dog={dog} onReload={onReload} />}
         {tab === 'owners' && <OwnersTab dog={dog} onReload={onReload} />}
