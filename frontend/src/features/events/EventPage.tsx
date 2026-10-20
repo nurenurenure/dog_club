@@ -49,12 +49,16 @@ function EventCard({ event, onReload }: { event: Event; onReload: () => void }) 
         eyebrow={event.type.name}
         title={event.name}
         actions={
-          profile.role === 'staff' &&
-          editable(event) && (
-            <ButtonLink to={`/events/${event.id}/edit`} variant="secondary">
-              Исправить
+          <>
+            <ButtonLink to={`/documents?event=${event.id}`} variant="secondary">
+              Документы
             </ButtonLink>
-          )
+            {profile.role === 'staff' && editable(event) && (
+              <ButtonLink to={`/events/${event.id}/edit`} variant="secondary">
+                Исправить
+              </ButtonLink>
+            )}
+          </>
         }
       />
       <div className={styles.chips}>

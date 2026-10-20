@@ -101,7 +101,7 @@ function DogCard({ dog, onReload }: { dog: Dog; onReload: () => void }) {
           }
         />
         <Fact label="Титулы" value={dog.titles[0]?.type.name ?? 'Нет'} note={dog.titles.length > 0 ? pluralize(dog.titles.length, 'запись', 'записи', 'записей') : undefined} />
-        <Fact label="Версия карточки" value={dog.version} />
+        <Fact label="Документы" value={<Link to={`/documents?dog=${dog.id}`}>Открыть</Link>} note={`Версия карточки ${dog.version}`} />
       </Facts>
 
       <Tabs label="Разделы карточки" idPrefix="dog" value={tab} options={tabs} onChange={(value) => setParams(value === 'health' ? {} : { tab: value }, { replace: true })} />

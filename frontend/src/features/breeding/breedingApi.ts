@@ -69,9 +69,10 @@ export function usePairCheck(id: number, enabled: boolean) {
   return useQuery({ queryKey: breedingKeys.check(id), enabled, queryFn: () => call(api.GET('/api/v1/breeding-requests/{id}/check', byID(id))) });
 }
 
-export function useDecisions(id: number) {
+export function useDecisions(id: number, enabled = true) {
   return useQuery({
     queryKey: breedingKeys.decisions(id),
+    enabled,
     queryFn: () => all((after) => call(api.GET('/api/v1/breeding-requests/{id}/decisions', { params: { path: { id }, query: { after: after || undefined, limit: 100 } } }))),
   });
 }

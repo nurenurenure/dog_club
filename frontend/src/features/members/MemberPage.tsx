@@ -60,7 +60,7 @@ function MemberCard({ member, own, onReload }: { member: Member; own?: boolean; 
         <Fact label="Членство" value={<MembershipChip status={member.membership_status} />} />
         <Fact label="В клубе с" value={formatDate(member.membership_date)} />
         <Fact label="Дата рождения" value={formatDate(member.date_of_birth)} />
-        <Fact label="Версия карточки" value={member.version} />
+        <Fact label="Документы" value={<Link to={own ? '/documents' : `/documents?member=${member.id}`}>Открыть</Link>} note={`Версия карточки ${member.version}`} />
       </Facts>
       {own && <p className={styles.note}>Изменить данные карточки может сотрудник клуба.</p>}
       <Tabs label="Разделы карточки" idPrefix="member" value={tab} options={tabs} onChange={(value) => setParams(value === 'contacts' ? {} : { tab: value }, { replace: true })} />

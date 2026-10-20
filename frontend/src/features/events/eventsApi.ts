@@ -81,9 +81,10 @@ export function useRegistration(eventID: number, id: number) {
   });
 }
 
-export function useResults(eventID: number) {
+export function useResults(eventID: number, enabled = true) {
   return useQuery({
     queryKey: eventKeys.results(eventID),
+    enabled,
     queryFn: () => all((after) => call(api.GET('/api/v1/events/{eventID}/results', { params: { path: { eventID }, query: page(after) } }))),
   });
 }
