@@ -1,0 +1,113 @@
+.scroll {
+  overflow-x: auto;
+  border: var(--border);
+  border-radius: var(--radius-table);
+  background: var(--white);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.table th {
+  padding: 12px var(--space-4);
+  background: var(--sand);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px var(--space-4);
+  border-top: var(--border);
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+.table a {
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-4);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-4) 18px;
+  border: var(--border);
+  border-radius: 20px;
+  background: var(--paper);
+}
+
+.fact dd {
+  margin: 0;
+}
+
+.factLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.factValue {
+  font-size: 16px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.factNote {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.factAction {
+  margin-top: var(--space-1);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-end;
+}
+
+.toolbar > * {
+  flex: 1 1 180px;
+}
+
+.toolbar > :first-child {
+  flex: 2 1 260px;
+}
+
+.more {
+  align-self: center;
+}

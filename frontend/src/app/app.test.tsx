@@ -27,6 +27,8 @@ describe('authentication flow', () => {
     mockFetch({
       'POST /api/v1/auth/refresh': () => problem(401, 'unauthenticated', 'Войдите.'),
       'POST /api/v1/auth/login': () => json(staffCredentials),
+      'GET /api/v1/member-dictionaries': () => json({ address_types: [], contact_types: [], membership_statuses: [] }),
+      'GET /api/v1/members': () => json({ members: [], next_after: null }),
     });
     const router = renderApp('/members');
     expect(await screen.findByRole('heading', { name: 'Где собаки становятся чемпионами' })).toBeTruthy();

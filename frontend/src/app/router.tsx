@@ -1,6 +1,9 @@
 import { Navigate, Outlet, useLocation, type RouteObject } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { AccountPage } from '../features/account/AccountPage';
+import { DogsRoutes } from '../features/dogs/DogsRoutes';
+import { OwnCardPage } from '../features/members/MemberPage';
+import { MembersRoutes } from '../features/members/MembersRoutes';
 import { LoginPage, type LoginNotice } from '../features/auth/LoginPage';
 import { NoAccess, NotFound, SectionPlaceholder } from '../features/sections/SectionPage';
 import { Shell } from '../shared/layout/Shell';
@@ -30,10 +33,17 @@ function RoleSection({ section, children }: { section: SectionKey; children?: Re
   return <>{children ?? <SectionPlaceholder section={section} />}</>;
 }
 
+// Sections built so far; the rest show a placeholder with the step of the plan.
+const screens: Partial<Record<SectionKey, React.ReactNode>> = {
+  dogs: <DogsRoutes />,
+  members: <MembersRoutes />,
+  card: <OwnCardPage />,
+};
+
 const sectionRoutes = (Object.keys(sections) as SectionKey[]).map((key) => ({
   path: sections[key].path === '/' ? undefined : `${sections[key].path}/*`,
   index: sections[key].path === '/',
-  element: <RoleSection section={key} />,
+  element: <RoleSection section={key}>{screens[key]}</RoleSection>,
 }));
 
 export const routes: RouteObject[] = [

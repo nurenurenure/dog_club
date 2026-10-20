@@ -1,0 +1,53 @@
+.timeline {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.entry {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 0 var(--space-5) 28px;
+  border-left: 2px solid var(--line);
+  margin-left: 6px;
+}
+
+.entry:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+
+.dot {
+  position: absolute;
+  top: 5px;
+  left: -8px;
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--paper);
+  border-radius: 50%;
+  background: var(--lime);
+}
+
+.title {
+  font-weight: 600;
+}
+
+.version {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.details {
+  font-size: 14px;
+}
+
+.meta {
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}

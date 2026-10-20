@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { refreshSession } from '../api/refresh';
 import { getSession, subscribeSession, type Credentials } from '../api/session';
 import * as authApi from './authApi';
@@ -15,6 +15,8 @@ interface AuthValue {
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
+
+const sessionKey = (session: Credentials | null) => (session ? `${session.user.id}:${session.profile.id}` : '');
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -32,11 +34,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Cached data belongs to one account and profile; drop it when they change.
-  const sessionKey = credentials ? `${credentials.user.id}:${credentials.profile.id}` : '';
-  useEffect(() => {
-    queryClient.clear();
-  }, [sessionKey, queryClient]);
+  // Cached data belongs to one account and profile; drop it when they change. The cache is
+  // cleared inside setSession, before screens of the new session render: a passive effect
+  // would run after their queries had started and would drop those queries in flight.
+  useLayoutEffect(() => {
+    let key = sessionKey(getSession());
+    return subscribeSession(() => {
+      const next = sessionKey(getSession());
+      if (next !== key) {
+        key = next;
+        queryClient.clear();
+      }
+    });
+  }, [queryClient]);
 
   const login = useCallback(async (name: string, password: string) => {
     await authApi.login(name, password);

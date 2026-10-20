@@ -1,0 +1,257 @@
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-8) var(--space-8);
+  border-radius: var(--radius-promo);
+  background: var(--forest);
+  color: var(--cream);
+}
+
+.crumbs {
+  font-size: 14px;
+  color: var(--lime-soft);
+}
+
+.crumbs a {
+  color: var(--lime-soft);
+}
+
+.heroBody {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-8);
+}
+
+.portrait {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 160px;
+  height: 192px;
+  border: 4px solid var(--lime);
+  border-radius: 28px;
+  background: var(--forest-deep);
+  color: var(--lime-light);
+}
+
+.heroText {
+  flex: 1 1 360px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.heroChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.heroStatus {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 3px 12px;
+  border: 1.5px solid var(--lime-light);
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nickname {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(56px, 9vw, 112px);
+  line-height: 0.85;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.heroMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 24px;
+  font-size: 15px;
+}
+
+.heroMeta b {
+  font-variant-numeric: tabular-nums;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.onForest {
+  border-color: var(--cream);
+  color: var(--cream);
+}
+
+.onForest:hover {
+  background: var(--forest-deep);
+  color: var(--cream);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.cardHeading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.start {
+  align-self: flex-start;
+}
+
+.note {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.picked {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: 10px var(--space-4);
+  border: 1.5px solid var(--forest);
+  border-radius: var(--radius-field);
+  background: var(--white);
+}
+
+.pedigreeDoc {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 15px;
+}
+
+.tree {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.treeDeep {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.treeColumn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.node {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--forest);
+  border-radius: var(--radius-table);
+  background: var(--white);
+}
+
+.nodeSelf {
+  border: 0;
+  background: var(--ink);
+  color: var(--cream);
+}
+
+.nodeSelf .nodeRole {
+  color: var(--lime-soft);
+}
+
+.nodeExternal {
+  border-style: dashed;
+  border-color: var(--field-line);
+}
+
+.nodeUnknown {
+  border: 1.5px dashed var(--line);
+  background: transparent;
+}
+
+.nodeSmall {
+  padding: 10px var(--space-3);
+}
+
+.nodeName {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.nodeSelf .nodeName {
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.nodeRole {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.nodeNote {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 719px) {
+  .hero {
+    padding: var(--space-5) var(--space-4) var(--space-6);
+    border-radius: var(--radius-card);
+  }
+
+  .heroBody {
+    gap: var(--space-5);
+  }
+
+  .portrait {
+    width: 104px;
+    height: 124px;
+    border-width: 3px;
+    border-radius: 20px;
+  }
+
+  .tree,
+  .treeDeep {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
