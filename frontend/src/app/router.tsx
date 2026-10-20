@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation, type RouteObject } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { AccountPage } from '../features/account/AccountPage';
+import { BreedingRoutes } from '../features/breeding/BreedingRoutes';
 import { DogsRoutes } from '../features/dogs/DogsRoutes';
 import { OwnCardPage } from '../features/members/MemberPage';
 import { MembersRoutes } from '../features/members/MembersRoutes';
@@ -42,6 +43,7 @@ const screens: Partial<Record<SectionKey, React.ReactNode>> = {
   card: <OwnCardPage />,
   patients: <PatientsRoutes />,
   vaccines: <VaccinesPage />,
+  breeding: <BreedingRoutes />,
 };
 
 const sectionRoutes = (Object.keys(sections) as SectionKey[]).map((key) => ({

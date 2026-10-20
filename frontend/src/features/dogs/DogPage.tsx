@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router';
 import { useSession } from '../../auth/AuthProvider';
 import { formatAge, formatDate, pluralize, todayUTC } from '../../shared/format';
 import { Alert, Button, ButtonLink, Chip, Fact, Facts, Loading, QueryError, ReasonDialog, Tabs, TextField, tabPanelProps } from '../../shared/ui';
+import { DogBreedingTab } from '../breeding/DogBreedingTab';
 import { HealthTab } from '../veterinary/HealthTab';
 import { DogHistoryTab } from './DogHistoryTab';
 import { dogsApi, isActiveStatus, useDog, useDogDictionaries, useDogSaved, type Dog } from './dogsApi';
@@ -18,6 +19,7 @@ const tabs = [
   { value: 'pedigree', label: 'Родословная' },
   { value: 'titles', label: 'Титулы' },
   { value: 'owners', label: 'Владельцы' },
+  { value: 'breeding', label: 'Вязки' },
   { value: 'history', label: 'История' },
 ] as const;
 type Tab = (typeof tabs)[number]['value'];
@@ -107,6 +109,7 @@ function DogCard({ dog, onReload }: { dog: Dog; onReload: () => void }) {
         {tab === 'pedigree' && <PedigreeTab dog={dog} onReload={onReload} />}
         {tab === 'titles' && <TitlesTab dog={dog} onReload={onReload} />}
         {tab === 'owners' && <OwnersTab dog={dog} onReload={onReload} />}
+        {tab === 'breeding' && <DogBreedingTab dogID={dog.id} active={active} />}
         {tab === 'history' && <DogHistoryTab dogID={dog.id} />}
       </section>
 

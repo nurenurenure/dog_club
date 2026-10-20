@@ -77,6 +77,7 @@ export function useDogSaved() {
 const path = (dogID: number) => ({ params: { path: { dogID } } });
 
 export const dogsApi = {
+  get: (dogID: number) => call(api.GET('/api/v1/dogs/{dogID}', path(dogID))),
   create: (body: DogCreateInput) => call(api.POST('/api/v1/dogs', { body })),
   patch: (dogID: number, body: DogPatchInput) => call(api.PATCH('/api/v1/dogs/{dogID}', { ...path(dogID), body })),
   setOwners: (dogID: number, version: number, owner_ids: number[]) => call(api.PUT('/api/v1/dogs/{dogID}/owners', { ...path(dogID), body: { version, owner_ids } })),

@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { routes } from '../app/router';
+import type { Role } from '../api/session';
 import { AuthProvider } from '../auth/AuthProvider';
 import { staffCredentials } from './fetchMock';
 
@@ -18,6 +19,6 @@ export function renderApp(path: string) {
   return router;
 }
 
-export function credentialsFor(role: 'staff' | 'leader' | 'owner' | 'veterinarian' | 'admin') {
+export function credentialsFor(role: Role) {
   return { ...staffCredentials, profile: { id: `p-${role}`, role, enabled: true } };
 }
