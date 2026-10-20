@@ -6,6 +6,7 @@ import heroPhoto from '../../assets/login-hero.jpg';
 import { useAuth } from '../../auth/AuthProvider';
 import * as authApi from '../../auth/authApi';
 import { Alert, Ball, Button, MIN_PASSWORD, PasswordField, ProblemAlert, Stamp, Tabs, TextField, passwordLength, tabPanelProps } from '../../shared/ui';
+import clsx from '../../shared/ui/clsx';
 import styles from './LoginPage.module.css';
 
 type Mode = 'login' | 'activate' | 'forgot';
@@ -68,7 +69,15 @@ export function LoginPage() {
       </section>
 
       <main className={styles.formSide}>
-        <h1 className={styles.headline}>{headlines[mode]}</h1>
+        {/* Every headline takes the same cell: the block is as tall as the longest one, so the form never moves. */}
+        <div className={styles.headlineBox}>
+          {Object.values(headlines).map((text) => (
+            <span key={text} className={clsx(styles.headline, styles.headlineGhost)} aria-hidden="true">
+              {text}
+            </span>
+          ))}
+          <h1 className={styles.headline}>{headlines[mode]}</h1>
+        </div>
         <div className={styles.panel}>
           <Tabs label="Способ входа" idPrefix="auth" value={mode} options={modes} onChange={setMode} />
           <div {...tabPanelProps('auth', mode)}>
