@@ -176,9 +176,9 @@ type CorrectionInput struct {
 	Reason  string `json:"reason"`
 }
 type Filter struct {
-	Query                             string
-	BreedID, StatusID, OwnerID, After int32
-	Limit                             int
+	Query                                    string
+	BreedID, StatusID, SexID, OwnerID, After int32
+	Limit                                    int
 }
 type Page struct {
 	Dogs      []Summary `json:"dogs"`

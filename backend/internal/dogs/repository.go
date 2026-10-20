@@ -273,9 +273,9 @@ func likePattern(s string) string {
 	return "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(s) + "%"
 }
 func (q *repository) list(ctx context.Context, f Filter) (Page, error) {
-	rows, err := q.tx.Query(ctx, `SELECT `+summaryColumns+summaryFrom+` WHERE d.dog_id>$1 AND($2::integer=0 OR d.dog_breed_id=$2) AND($3::integer=0 OR d.dog_status_id=$3)
+	rows, err := q.tx.Query(ctx, `SELECT `+summaryColumns+summaryFrom+` WHERE d.dog_id>$1 AND($2::integer=0 OR d.dog_breed_id=$2) AND($3::integer=0 OR d.dog_status_id=$3) AND($8::integer=0 OR d.sex_id=$8)
 AND($4::integer=0 OR EXISTS(SELECT 1 FROM dog_club_member o WHERE o.dog_id=d.dog_id AND o.club_member_id=$4))
-AND($5::text='' OR d.dog_nickname ILIKE $6 OR d.dog_identifier_number ILIKE $6 OR EXISTS(SELECT 1 FROM pedigree p WHERE p.dog_id=d.dog_id AND p.pedigree_number ILIKE $6)) ORDER BY d.dog_id LIMIT $7`, f.After, f.BreedID, f.StatusID, f.OwnerID, f.Query, likePattern(f.Query), f.Limit+1)
+AND($5::text='' OR d.dog_nickname ILIKE $6 OR d.dog_identifier_number ILIKE $6 OR EXISTS(SELECT 1 FROM pedigree p WHERE p.dog_id=d.dog_id AND p.pedigree_number ILIKE $6)) ORDER BY d.dog_id LIMIT $7`, f.After, f.BreedID, f.StatusID, f.OwnerID, f.Query, likePattern(f.Query), f.Limit+1, f.SexID)
 	if err != nil {
 		return Page{}, storageError(err)
 	}

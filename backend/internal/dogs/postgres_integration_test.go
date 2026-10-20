@@ -204,6 +204,13 @@ func TestPostgresDogLifecycleAndPermissions(t *testing.T) {
 			t.Fatal("dog search returned unexpected rows")
 		}
 	}
+	females, err := s.List(ctx, leader, Filter{SexID: female, Limit: 50})
+	must(err)
+	if len(females.Dogs) != 2 || females.Dogs[0].ID != mother.ID || females.Dogs[1].ID != child.ID {
+		t.Fatal("dog sex filter returned unexpected rows")
+	}
+	_, err = s.List(ctx, leader, Filter{SexID: -1, Limit: 50})
+	validation(err)
 	page, err := s.List(ctx, owner, Filter{Limit: 50})
 	must(err)
 	if len(page.Dogs) != 1 || page.Dogs[0].ID != child.ID {

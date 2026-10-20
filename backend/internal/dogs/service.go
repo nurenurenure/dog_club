@@ -57,7 +57,7 @@ func (s *Service) ListForVeterinary(ctx context.Context, tx pgx.Tx, p auth.Princ
 		return Page{}, err
 	}
 	f.Query = strings.TrimSpace(f.Query)
-	if f.After < 0 || f.Limit < 1 || f.Limit > 100 || f.OwnerID < 0 || f.BreedID < 0 || f.StatusID < 0 || !validText(f.Query, 100) {
+	if f.After < 0 || f.Limit < 1 || f.Limit > 100 || f.OwnerID < 0 || f.BreedID < 0 || f.StatusID < 0 || f.SexID < 0 || !validText(f.Query, 100) {
 		return Page{}, invalid("query", "Проверьте параметры поиска и страницы.")
 	}
 	memberID, err := s.owner(ctx, tx, p)
@@ -184,7 +184,7 @@ func (s *Service) Get(ctx context.Context, p auth.Principal, id int32) (Dog, err
 }
 func (s *Service) List(ctx context.Context, p auth.Principal, f Filter) (Page, error) {
 	f.Query = strings.TrimSpace(f.Query)
-	if f.After < 0 || f.Limit < 1 || f.Limit > 100 || f.OwnerID < 0 || f.BreedID < 0 || f.StatusID < 0 || !validText(f.Query, 100) {
+	if f.After < 0 || f.Limit < 1 || f.Limit > 100 || f.OwnerID < 0 || f.BreedID < 0 || f.StatusID < 0 || f.SexID < 0 || !validText(f.Query, 100) {
 		return Page{}, invalid("query", "Проверьте поиск, фильтры и параметры страницы.")
 	}
 	var result Page

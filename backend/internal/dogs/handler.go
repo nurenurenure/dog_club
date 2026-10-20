@@ -93,7 +93,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	for _, v := range []struct {
 		name          string
 		fallback, max int64
-	}{{"after", 0, 1<<31 - 1}, {"limit", 50, 100}, {"breed_id", 0, 1<<31 - 1}, {"status_id", 0, 1<<31 - 1}, {"owner_id", 0, 1<<31 - 1}} {
+	}{{"after", 0, 1<<31 - 1}, {"limit", 50, 100}, {"breed_id", 0, 1<<31 - 1}, {"status_id", 0, 1<<31 - 1}, {"sex_id", 0, 1<<31 - 1}, {"owner_id", 0, 1<<31 - 1}} {
 		n, err := queryNumber(r, v.name, v.fallback, v.max)
 		if err != nil {
 			writeError(w, r, err)
@@ -105,7 +105,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, invalid("q", "Укажите поисковый запрос один раз."))
 		return
 	}
-	page, err := h.service.List(r.Context(), auth.PrincipalFrom(r), Filter{Query: r.URL.Query().Get("q"), After: int32(values["after"]), Limit: int(values["limit"]), BreedID: int32(values["breed_id"]), StatusID: int32(values["status_id"]), OwnerID: int32(values["owner_id"])})
+	page, err := h.service.List(r.Context(), auth.PrincipalFrom(r), Filter{Query: r.URL.Query().Get("q"), After: int32(values["after"]), Limit: int(values["limit"]), BreedID: int32(values["breed_id"]), StatusID: int32(values["status_id"]), SexID: int32(values["sex_id"]), OwnerID: int32(values["owner_id"])})
 	respond(w, r, page, err)
 }
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
