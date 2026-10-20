@@ -252,3 +252,19 @@ given a different name.
 $Id$
 
 ```
+
+# Веб-клиент
+
+Точные версии npm-пакетов закреплены в `frontend/package-lock.json`; тексты лицензий
+лежат в каталогах пакетов `node_modules`. В сборку `frontend/dist` попадают:
+
+| Компонент | Лицензия |
+| --- | --- |
+| react, react-dom, react-router, @tanstack/react-query, openapi-fetch | MIT |
+| lucide-react | ISC |
+| Fira Sans Extra Condensed (@fontsource/fira-sans-extra-condensed) | SIL Open Font License 1.1 |
+| Onest (@fontsource/onest) | SIL Open Font License 1.1 |
+
+Фото на экране входа (`frontend/src/assets/login-hero.jpg`) — Karsten Winegeart,
+[Unsplash](https://unsplash.com/photos/french-bulldog-in-green-vest-BJaqPaH6AGQ),
+по [Unsplash License](https://unsplash.com/license); уменьшено до 734×1100.
