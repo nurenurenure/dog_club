@@ -66,9 +66,10 @@ export function useEvent(id: number) {
   return useQuery({ queryKey: eventKeys.event(id), queryFn: () => call(api.GET('/api/v1/events/{eventID}', { params: { path: { eventID: id } } })) });
 }
 
-export function useRegistrations(eventID: number) {
+export function useRegistrations(eventID: number, enabled = true) {
   return useQuery({
     queryKey: eventKeys.registrations(eventID),
+    enabled,
     queryFn: () => all((after) => call(api.GET('/api/v1/events/{eventID}/registrations', { params: { path: { eventID }, query: page(after) } }))),
   });
 }

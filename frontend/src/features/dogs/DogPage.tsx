@@ -5,6 +5,7 @@ import { useSession } from '../../auth/AuthProvider';
 import { formatAge, formatDate, pluralize, todayUTC } from '../../shared/format';
 import { Alert, Button, ButtonLink, Chip, Fact, Facts, Loading, QueryError, ReasonDialog, Tabs, TextField, tabPanelProps } from '../../shared/ui';
 import { DogBreedingTab } from '../breeding/DogBreedingTab';
+import { DogTrainingTab } from '../training/DogTrainingTab';
 import { HealthTab } from '../veterinary/HealthTab';
 import { DogHistoryTab } from './DogHistoryTab';
 import { dogsApi, isActiveStatus, useDog, useDogDictionaries, useDogSaved, type Dog } from './dogsApi';
@@ -13,13 +14,13 @@ import { PedigreeTab } from './PedigreeTab';
 import { TitlesTab } from './TitlesTab';
 import styles from './dogs.module.css';
 
-// Documents and events join the card on their own steps of the plan.
 const tabs = [
   { value: 'health', label: 'Здоровье' },
   { value: 'pedigree', label: 'Родословная' },
   { value: 'titles', label: 'Титулы' },
   { value: 'owners', label: 'Владельцы' },
   { value: 'breeding', label: 'Вязки' },
+  { value: 'training', label: 'Дрессировка' },
   { value: 'history', label: 'История' },
 ] as const;
 type Tab = (typeof tabs)[number]['value'];
@@ -110,6 +111,7 @@ function DogCard({ dog, onReload }: { dog: Dog; onReload: () => void }) {
         {tab === 'titles' && <TitlesTab dog={dog} onReload={onReload} />}
         {tab === 'owners' && <OwnersTab dog={dog} onReload={onReload} />}
         {tab === 'breeding' && <DogBreedingTab dogID={dog.id} active={active} />}
+        {tab === 'training' && <DogTrainingTab dogID={dog.id} active={active} />}
         {tab === 'history' && <DogHistoryTab dogID={dog.id} />}
       </section>
 
