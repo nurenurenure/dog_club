@@ -11,6 +11,7 @@ import (
 
 	"dogclub.local/backend/internal/auth"
 	"dogclub.local/backend/internal/members"
+	"dogclub.local/backend/internal/platform/filestore"
 	"dogclub.local/backend/internal/platform/notify"
 	"github.com/jackc/pgx/v5"
 )
@@ -23,6 +24,7 @@ type Service struct {
 	dates         MedicalDatesPolicy
 	breeding      BreedingPolicy
 	events        EventPolicy
+	photos        *filestore.Store
 	now           func() time.Time
 }
 

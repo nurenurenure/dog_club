@@ -70,6 +70,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		pool.Close()
 		return nil, fmt.Errorf("private document storage unavailable")
 	}
+	dogService.SetPhotoStore(files)
 	reportService := reports.NewService(service, memberService, dogService, breedingService, eventService)
 	documentService := documents.NewService(service, memberService, dogService, vetService, files, breedingService, eventService)
 	notifier := notifications.New(pool, service, memberService, dogService, mailer, map[string]notify.Provider{"dogs": dogService, "veterinary": vetService, "breeding": breedingService, "events": eventService, "documents": documentService})

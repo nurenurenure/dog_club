@@ -32,7 +32,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if err := Run(ctx, "status", url, &output); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(output.String(), "pending") != 14 || scalar(t, ctx, conn,
+	if strings.Count(output.String(), "pending") != 15 || scalar(t, ctx, conn,
 		`SELECT count(*) FROM pg_tables WHERE schemaname='public'`) != 0 {
 		t.Fatal("status on an empty database must list pending migrations without creating tables")
 	}
@@ -46,19 +46,19 @@ func TestPostgresMigrations(t *testing.T) {
 			t.Fatalf("unexpected migration result: %q", output.String())
 		}
 	}
-	apply("applied 14 migration(s)\n")
-	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 66 {
-		t.Fatalf("expected 65 application tables and Goose history, got %d", count)
+	apply("applied 15 migration(s)\n")
+	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 67 {
+		t.Fatalf("expected 66 application tables and Goose history, got %d", count)
 	}
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_constraint c JOIN pg_namespace n
-		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 127 {
-		t.Fatalf("expected 114 previous and 13 training FK, got %d", count)
+		ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f'`); count != 129 {
+		t.Fatalf("expected 114 previous, 13 training and 2 dog photo FK, got %d", count)
 	}
 	checkSeeds(t, ctx, conn)
 	apply("applied 0 migration(s)\n")
 	output.Reset()
-	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 14 {
-		t.Fatalf("expected fourteen applied versions: %v %q", err, output.String())
+	if err := Run(ctx, "status", url, &output); err != nil || strings.Count(output.String(), "applied") != 15 {
+		t.Fatalf("expected fifteen applied versions: %v %q", err, output.String())
 	}
 
 	t.Run("constraints and deletion policies", func(t *testing.T) {
@@ -168,7 +168,7 @@ func TestPostgresMigrations(t *testing.T) {
 		checkSeeds(t, ctx, conn)
 	})
 
-	for range 14 {
+	for range 15 {
 		if err := Run(ctx, "down", url, io.Discard); err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestPostgresMigrations(t *testing.T) {
 	if count := scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public'`); count != 1 {
 		t.Fatalf("full rollback must leave only Goose history, got %d tables", count)
 	}
-	apply("applied 14 migration(s)\n")
+	apply("applied 15 migration(s)\n")
 	checkSeeds(t, ctx, conn)
 }
 
@@ -763,6 +763,7 @@ func TestDogStatusActivityRollbackProtectsDogs(t *testing.T) {
  SELECT 1401,'Synthetic lost dog','2020-01-01','STATUS-1401',dog_status_id,1,1,1,1 FROM dog_status WHERE dog_status_name='Потеряна'`); err != nil {
 		t.Fatal(err)
 	}
+	rollbackTo(t, ctx, url, 14)
 	if err := Run(ctx, "down", url, io.Discard); err == nil || !strings.Contains(err.Error(), "23001") {
 		t.Fatalf("rollback orphaned a dog status: %v", err)
 	}
@@ -779,4 +780,34 @@ func TestDogStatusActivityRollbackProtectsDogs(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkSeeds(t, ctx, conn)
+}
+
+func TestDogPhotoRollbackKeepsStoredPhotos(t *testing.T) {
+	ctx, url, conn := testDatabase(t)
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `INSERT INTO users(user_id,login,email) VALUES('photo-test-user','photo_test','synthetic@photo.test');
+ INSERT INTO user_profiles(profile_id,user_id,role_id) SELECT 'photo-test-profile','photo-test-user',role_id FROM role WHERE code='staff';
+ INSERT INTO dog(dog_id,dog_nickname,dog_date_of_birth,dog_identifier_number,dog_status_id,identifier_type_id,dog_breed_id,coat_color_id,sex_id)
+ VALUES(1501,'Synthetic photo dog','2020-01-01','PHOTO-1501',1,1,1,1,1);
+ INSERT INTO dog_photo(dog_id,storage_key,media_type,size_bytes,sha256,width,height,updated_by_profile_id)
+ VALUES(1501,repeat('a',64),'image/png',10,repeat('b',64),1,1,'photo-test-profile')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "down", url, io.Discard); err == nil || !strings.Contains(err.Error(), "23001") {
+		t.Fatalf("rollback dropped stored photos: %v", err)
+	}
+	if _, err := conn.Exec(ctx, `DELETE FROM dog_photo`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(ctx, "down", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if scalar(t, ctx, conn, `SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename='dog_photo'`) != 0 {
+		t.Fatal("rollback left the photo table")
+	}
+	if err := Run(ctx, "up", url, io.Discard); err != nil {
+		t.Fatal(err)
+	}
 }

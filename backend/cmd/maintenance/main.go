@@ -1,4 +1,4 @@
-// maintenance verifies all registered immutable files without printing their keys.
+// maintenance verifies all registered private files without printing their keys.
 package main
 
 import (
@@ -33,7 +33,8 @@ func run() error {
 		return err
 	}
 	defer f.Close()
-	rows, err := p.Query(ctx, `SELECT storage_key,size_bytes,sha256 FROM document_file ORDER BY storage_key`)
+	// Document files and dog photos share the private store; both are verified.
+	rows, err := p.Query(ctx, `SELECT storage_key,size_bytes,sha256 FROM document_file UNION ALL SELECT storage_key,size_bytes,sha256 FROM dog_photo ORDER BY storage_key`)
 	if err != nil {
 		return err
 	}

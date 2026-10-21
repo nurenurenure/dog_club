@@ -30,6 +30,10 @@ func (h *Handler) RegisterRoutes(router chi.Router) {
 		r.Post("/dogs/{dogID}/titles", h.title)
 		r.Put("/dogs/{dogID}/titles/{titleID}", h.updateTitle)
 		r.Delete("/dogs/{dogID}/titles/{titleID}", h.correctTitle)
+		r.Get("/dogs/{dogID}/photo", h.photo)
+		r.Get("/dogs/{dogID}/photo/file", h.photoFile)
+		r.Put("/dogs/{dogID}/photo", h.setPhoto)
+		r.Delete("/dogs/{dogID}/photo", h.removePhoto)
 		r.Get("/dog-dictionaries", h.dictionaries)
 	})
 }

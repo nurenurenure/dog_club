@@ -1865,6 +1865,61 @@ components:
                 - pedigree_number
                 - pedigree_issuer
             type: object
+        DogPhoto:
+            additionalProperties: false
+            properties:
+                dog_id:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                height:
+                    minimum: 1
+                    type: integer
+                media_type:
+                    enum:
+                        - image/jpeg
+                        - image/png
+                    type: string
+                size_bytes:
+                    format: int64
+                    maximum: 5242880
+                    minimum: 1
+                    type: integer
+                updated_at:
+                    format: date-time
+                    type: string
+                version:
+                    description: Версия фото, не карточки собаки; растёт и после удаления фото.
+                    format: int64
+                    minimum: 1
+                    type: integer
+                width:
+                    minimum: 1
+                    type: integer
+            required:
+                - dog_id
+                - media_type
+                - size_bytes
+                - width
+                - height
+                - version
+                - updated_at
+            type: object
+        DogPhotoRemoval:
+            additionalProperties: false
+            properties:
+                reason:
+                    maxLength: 500
+                    minLength: 1
+                    type: string
+                version:
+                    format: int64
+                    minimum: 1
+                    type: integer
+            required:
+                - version
+                - reason
+            type: object
         DogSummary:
             additionalProperties: false
             properties:
@@ -5870,7 +5925,7 @@ components:
 info:
     description: Этапы 04–09 и части 1–4 этапа 10. Закрытые документы, девять документных PDF-форм и сводный отчёт в JSON/PDF/CSV без серверного архива. Права, версии, история и снимки документов; показатели за период, текущие итоги и полнота дат отчёта.
     title: Клуб собаководства — backend
-    version: 0.13.0
+    version: 0.14.0
 openapi: 3.1.1
 paths:
     /api/v1/operations/metrics:
@@ -8740,6 +8795,228 @@ paths:
             security:
                 - bearerAuth: []
             summary: 'Полная замена сведений о происхождении: staff'
+            tags:
+                - Dogs
+    /api/v1/dogs/{dogID}/photo:
+        delete:
+            description: Нужны текущая версия фото и причина; запись остаётся в истории собаки. Версия карточки собаки не меняется.
+            operationId: removeDogPhoto
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/DogPhotoRemoval'
+                required: true
+            responses:
+                "204":
+                    description: Фото убрано
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Убрать фото собаки: staff'
+            tags:
+                - Dogs
+        get:
+            description: Сведения о текущем фото; 404, если фото нет. Владелец видит фото только своих собак; ветеринар и эксперт — любых собак своих разделов.
+            operationId: getDogPhoto
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DogPhoto'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Сведения о фото собаки: staff, leader, owner, veterinarian, expert'
+            tags:
+                - Dogs
+        put:
+            description: Новое фото или замена текущего; version — текущая версия фото или 0, если фото нет. JPEG или PNG до 5 МиБ и 40 мегапикселей; тип проверяется по содержимому. Версия карточки собаки не меняется.
+            operationId: setDogPhoto
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            requestBody:
+                content:
+                    multipart/form-data:
+                        schema:
+                            additionalProperties: false
+                            properties:
+                                file:
+                                    format: binary
+                                    type: string
+                                version:
+                                    format: int64
+                                    minimum: 0
+                                    type: integer
+                            required:
+                                - version
+                                - file
+                            type: object
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DogPhoto'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Загрузить или заменить фото собаки: staff'
+            tags:
+                - Dogs
+    /api/v1/dogs/{dogID}/photo/file:
+        get:
+            description: Изображение для показа на странице; права проверяются при каждом чтении.
+            operationId: getDogPhotoFile
+            parameters:
+                - in: path
+                  name: dogID
+                  required: true
+                  schema:
+                    format: int32
+                    maximum: 2147483647
+                    minimum: 1
+                    type: integer
+            responses:
+                "200":
+                    content:
+                        image/jpeg:
+                            schema:
+                                format: binary
+                                type: string
+                        image/png:
+                            schema:
+                                format: binary
+                                type: string
+                    description: Текущее фото собаки
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        Content-Disposition:
+                            required: true
+                            schema:
+                                type: string
+                        Content-Security-Policy:
+                            required: true
+                            schema:
+                                type: string
+                        X-Content-Type-Options:
+                            required: true
+                            schema:
+                                const: nosniff
+                                type: string
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "409":
+                    $ref: '#/components/responses/DogConflict'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/DogsUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Файл фото собаки: staff, leader, owner, veterinarian, expert'
             tags:
                 - Dogs
     /api/v1/dogs/{dogID}/titles:
