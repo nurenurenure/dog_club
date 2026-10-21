@@ -276,4 +276,6 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* Dog faces sit in the upper third of a portrait shot; wide frames keep them. */
+  object-position: 50% 30%;
 }

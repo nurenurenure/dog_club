@@ -187,7 +187,7 @@
 .storyPhoto {
   display: grid;
   place-items: center;
-  height: 120px;
+  height: 180px;
   margin-bottom: var(--space-2);
   border: 3px solid currentColor;
   border-radius: 20px;
