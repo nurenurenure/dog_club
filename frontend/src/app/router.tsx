@@ -22,11 +22,12 @@ import { Loading } from '../shared/ui';
 import { homePath, navItem, sections, type SectionKey } from './navigation';
 
 function RequireAuth() {
-  const { status } = useAuth();
+  const { status, signedOut } = useAuth();
   const location = useLocation();
   if (status === 'restoring') return <Loading label="Проверяем сессию…" />;
   if (status === 'anonymous') {
-    const state: LoginNotice = { from: location.pathname + location.search };
+    // An expired session returns to its page after login; a deliberate sign-out does not.
+    const state: LoginNotice = signedOut ? {} : { from: location.pathname + location.search };
     return <Navigate to="/login" replace state={state} />;
   }
   return <Outlet />;

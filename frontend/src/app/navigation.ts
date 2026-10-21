@@ -118,3 +118,23 @@ export function homePath(role: Role): string {
 export function navItem(role: Role, key: SectionKey): NavItem | undefined {
   return navByRole[role].find((item) => item.key === key);
 }
+
+/** The section a path belongs to: the longest matching section path wins. */
+export function sectionOfPath(path: string): SectionKey | undefined {
+  const pathname = path.split(/[?#]/)[0] || '/';
+  let found: SectionKey | undefined;
+  for (const key of Object.keys(sections) as SectionKey[]) {
+    const base = sections[key].path;
+    const match = base === '/' ? pathname === '/' : pathname === base || pathname.startsWith(`${base}/`);
+    if (match && (!found || base.length > sections[found].path.length)) found = key;
+  }
+  return found;
+}
+
+/** A page to return to after login: only inside the new profile's menu or the account page. */
+export function canReturnTo(role: Role, path: string): boolean {
+  const pathname = path.split(/[?#]/)[0] ?? '';
+  if (pathname === '/account') return true;
+  const section = sectionOfPath(path);
+  return Boolean(section && navItem(role, section));
+}

@@ -9,6 +9,8 @@ type Status = 'restoring' | 'anonymous' | 'authenticated';
 interface AuthValue {
   status: Status;
   credentials: Credentials | null;
+  /** True after an explicit sign-out: the next login must not return to the old page. */
+  signedOut: boolean;
   login: (login: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   switchProfile: (profileID: string) => Promise<void>;
@@ -22,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const credentials = useSyncExternalStore(subscribeSession, getSession);
   const [restoring, setRestoring] = useState(true);
+  const [signedOut, setSignedOut] = useState(false);
 
   // A reload loses the in-memory access token: restore it from the refresh cookie.
   useEffect(() => {
@@ -50,8 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (name: string, password: string) => {
     await authApi.login(name, password);
+    setSignedOut(false);
   }, []);
-  const logout = useCallback(() => authApi.logout(), []);
+  const logout = useCallback(() => {
+    setSignedOut(true);
+    return authApi.logout();
+  }, []);
   const switchProfile = useCallback(async (profileID: string) => {
     await authApi.switchProfile(profileID);
   }, []);
@@ -60,11 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       status: credentials ? 'authenticated' : restoring ? 'restoring' : 'anonymous',
       credentials,
+      signedOut,
       login,
       logout,
       switchProfile,
     }),
-    [credentials, restoring, login, logout, switchProfile],
+    [credentials, restoring, signedOut, login, logout, switchProfile],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

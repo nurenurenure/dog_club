@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import { ApiError, fieldErrors } from '../../api/problem';
-import { homePath } from '../../app/navigation';
+import { canReturnTo, homePath } from '../../app/navigation';
 import heroPhoto from '../../assets/login-hero.jpg';
 import { useAuth } from '../../auth/AuthProvider';
 import * as authApi from '../../auth/authApi';
@@ -37,7 +37,9 @@ export function LoginPage() {
   const [notice, setNotice] = useState(state.notice ?? '');
 
   if (status === 'authenticated' && credentials) {
-    return <Navigate to={state.from ?? homePath(credentials.profile.role)} replace />;
+    // The return page may belong to someone else's session: keep it only if this profile can open it.
+    const role = credentials.profile.role;
+    return <Navigate to={state.from && canReturnTo(role, state.from) ? state.from : homePath(role)} replace />;
   }
 
   const done = (message: string) => {

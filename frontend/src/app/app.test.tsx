@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router';
@@ -47,6 +47,40 @@ describe('authentication flow', () => {
     const nav = screen.getAllByRole('navigation', { name: 'Разделы' })[0]!;
     expect(within(nav).getByRole('link', { name: 'Пациенты' })).toBeTruthy();
     expect(within(nav).queryByRole('link', { name: 'Члены клуба' })).toBeNull();
+  });
+
+  it('does not send the next user to a page of another profile', async () => {
+    mockFetch({
+      'POST /api/v1/auth/refresh': () => problem(401, 'unauthenticated', 'Войдите.'),
+      'POST /api/v1/auth/login': () => json({ ...staffCredentials, profile: { id: 'p-owner', role: 'owner', enabled: true } }),
+    });
+    const router = renderApp('/admin/system');
+    expect(await screen.findByRole('heading', { name: 'Где собаки становятся чемпионами' })).toBeTruthy();
+    await userEvent.type(screen.getByLabelText('Логин'), 'ivanova.m');
+    await userEvent.type(screen.getByLabelText('Пароль'), 'a long synthetic passphrase');
+    await userEvent.click(screen.getByRole('button', { name: 'Войти' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    expect(screen.queryByText(/Раздел недоступен/)).toBeNull();
+  });
+
+  it('forgets the page after an explicit sign-out', async () => {
+    let signedIn = true;
+    mockFetch({
+      'POST /api/v1/auth/refresh': () => (signedIn ? json(staffCredentials) : problem(401, 'unauthenticated', 'Войдите.')),
+      'POST /api/v1/auth/logout': () => {
+        signedIn = false;
+        return new Response(null, { status: 204 });
+      },
+      'POST /api/v1/auth/login': () => json(staffCredentials),
+      'GET /api/v1/auth/profiles': () => json({ profiles: [staffCredentials.profile] }),
+      'GET /api/v1/member-dictionaries': () => json({ address_types: [], contact_types: [], membership_statuses: [] }),
+      'GET /api/v1/members': () => json({ members: [], next_after: null }),
+    });
+    const router = renderApp('/members');
+    await userEvent.click(await screen.findByRole('button', { name: /меню аккаунта/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Выйти' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'));
+    expect(router.state.location.state).toEqual({});
   });
 
   it('starts a non-dashboard role on its first section', async () => {
