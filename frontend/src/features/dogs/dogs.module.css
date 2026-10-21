@@ -262,12 +262,16 @@
 
 /* A photo frame takes its size and border from the place that uses it. */
 .photoFrame {
+  position: relative;
   display: grid;
   place-items: center;
   overflow: hidden;
 }
 
+/* Pinned to the frame: the picture fills any frame, sized by width, height or both. */
 .photo {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
