@@ -108,6 +108,17 @@ function RequestCard({ request, onReload }: { request: BreedingRequest; onReload
           <DogName id={request.male_dog_id} />
         </span>
       </div>
+      {/* The expert has no dog cards, so the pair offers mate candidates right here. */}
+      <p className={styles.note}>
+        Подобрать пару:{' '}
+        <Link to={`/breeding/candidates/${request.female_dog_id}`}>
+          для <DogName id={request.female_dog_id} plain />
+        </Link>
+        {' · '}
+        <Link to={`/breeding/candidates/${request.male_dog_id}`}>
+          для <DogName id={request.male_dog_id} plain />
+        </Link>
+      </p>
       <Facts>
         <Fact label="Статус" value={<RequestStatus status={request.status} />} />
         <Fact label="Планируемая дата" value={formatDate(request.planned_date)} />

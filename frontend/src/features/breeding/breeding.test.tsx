@@ -70,6 +70,9 @@ describe('breeding', () => {
     expect(screen.getByText('Дальнее родство')).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Одобрить' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText('Одобрение недоступно, пока есть блокирующие причины.')).toBeTruthy();
+    // The expert has no dog cards: mate candidates open from the request itself.
+    expect(screen.getByRole('link', { name: 'для Альма' }).getAttribute('href')).toBe('/breeding/candidates/9');
+    expect(screen.getByRole('link', { name: 'для Ричи' }).getAttribute('href')).toBe('/breeding/candidates/5');
   });
 
   it('files a request for a suggested pair', async () => {
