@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { fieldErrors } from '../../api/problem';
 import { useSession } from '../../auth/AuthProvider';
 import { formatDate } from '../../shared/format';
-import { Button, Card, Chip, EmptyState, FormDialog, Loading, QueryError, ReasonDialog, SelectField, TextArea, TextField, fieldStyles } from '../../shared/ui';
+import { Button, Card, Chip, EmptyState, FormDialog, Loading, QueryError, ReasonDialog, SelectField, TextArea, TextField, fieldStyles, MAX_REASON } from '../../shared/ui';
 import clsx from '../../shared/ui/clsx';
 import { decisions, isMine, purposes } from './labels';
 import { useClearances, useClinicalSaved, useExaminations, useVaccinations, vetApi, type Clearance } from './vetApi';
@@ -22,7 +22,7 @@ const emptyDraft: Draft = { purpose: '', examination_id: '', decision: '', valid
 
 /**
  * Clearances are not limited by the dog status, but each rests on the veterinarian's own
- * examination; a wrong one is voided and issued again.
+ * examination. The author corrects one with a reason or voids it and issues a new one.
  */
 export function ClearancesCard({ dogID, active }: { dogID: number; active: boolean }) {
   const { profile, user } = useSession();
@@ -32,6 +32,8 @@ export function ClearancesCard({ dogID, active }: { dogID: number; active: boole
   const vaccinations = useVaccinations(dogID);
   const saved = useClinicalSaved(dogID);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [editing, setEditing] = useState<Clearance | null>(null);
+  const [reason, setReason] = useState('');
   const [voiding, setVoiding] = useState<Clearance | null>(null);
   const [error, setError] = useState<unknown>(null);
   const errors = fieldErrors(error);
@@ -42,17 +44,62 @@ export function ClearancesCard({ dogID, active }: { dogID: number; active: boole
     return item ? `${item.vaccine.name} от ${formatDate(item.date)}` : `прививка №${id}`;
   };
 
+  const open = (item: Clearance | null) => {
+    setEditing(item);
+    setReason('');
+    setError(null);
+    setDraft(
+      item
+        ? {
+            purpose: item.purpose,
+            examination_id: String(item.examination_id),
+            decision: item.decision,
+            valid_until: item.valid_until ?? '',
+            vaccination_ids: item.vaccination_ids,
+            comment: item.comment,
+          }
+        : emptyDraft,
+    );
+  };
+
   const submit = async () => {
     if (!draft) return;
     const allowed = draft.decision === 'allowed';
     const base = { purpose: draft.purpose as Clearance['purpose'], examination_id: Number(draft.examination_id), comment: draft.comment.trim() || undefined };
     try {
-      await vetApi.addClearance(
-        dogID,
-        allowed
-          ? { ...base, decision: 'allowed', valid_until: draft.valid_until, vaccination_ids: draft.vaccination_ids }
-          : { ...base, decision: draft.decision as 'denied' | 'not_assessed' },
-      );
+      if (editing) {
+        // A correction states every field: a decision other than «allowed» clears the term and the bases.
+        await vetApi.correctClearance(
+          dogID,
+          editing.id,
+          allowed
+            ? {
+                ...base,
+                comment: draft.comment.trim(),
+                decision: 'allowed',
+                valid_until: draft.valid_until,
+                vaccination_ids: draft.vaccination_ids,
+                version: editing.version,
+                reason: reason.trim(),
+              }
+            : {
+                ...base,
+                comment: draft.comment.trim(),
+                decision: draft.decision as 'denied' | 'not_assessed',
+                valid_until: null,
+                vaccination_ids: [],
+                version: editing.version,
+                reason: reason.trim(),
+              },
+        );
+      } else {
+        await vetApi.addClearance(
+          dogID,
+          allowed
+            ? { ...base, decision: 'allowed', valid_until: draft.valid_until, vaccination_ids: draft.vaccination_ids }
+            : { ...base, decision: draft.decision as 'denied' | 'not_assessed' },
+        );
+      }
       setError(null);
       await saved();
     } catch (failure) {
@@ -61,8 +108,19 @@ export function ClearancesCard({ dogID, active }: { dogID: number; active: boole
     }
   };
 
-  const ready = Boolean(draft?.purpose && draft.examination_id && draft.decision && (draft.decision !== 'allowed' || (draft.valid_until && draft.vaccination_ids.length > 0)));
+  const ready = Boolean(
+    draft?.purpose &&
+      draft.examination_id &&
+      draft.decision &&
+      (draft.decision !== 'allowed' || (draft.valid_until && draft.vaccination_ids.length > 0)) &&
+      (!editing || reason.trim()),
+  );
   const exam = ownExams.find((item) => String(item.id) === draft?.examination_id);
+  // A correction keeps its examination selectable even if it is no longer among the own valid ones.
+  const examOptions = ownExams.map((item) => ({ value: item.id, label: `${formatDate(item.date)}${item.result ? ` · ${item.result}` : ''}` }));
+  if (editing && !ownExams.some((item) => item.id === editing.examination_id)) {
+    examOptions.push({ value: editing.examination_id, label: `${formatDate(editing.examination_date)} · осмотр недоступен` });
+  }
   // Without an own examination the form would be a dead end, e.g. for a lost dog.
   const canIssue = vet && ownExams.length > 0;
   const needsExam = vet && examinations.isSuccess && ownExams.length === 0;
@@ -73,7 +131,7 @@ export function ClearancesCard({ dogID, active }: { dogID: number; active: boole
         <span className={styles.heading}>
           Заключения о допуске
           {canIssue && (
-            <Button variant="secondary" size="small" onClick={() => setDraft(emptyDraft)}>
+            <Button variant="secondary" size="small" onClick={() => open(null)}>
               <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
               Новое заключение
             </Button>
@@ -110,6 +168,9 @@ export function ClearancesCard({ dogID, active }: { dogID: number; active: boole
               {item.comment && <p>{item.comment}</p>}
               {vet && isMine(item.author, user.id) && !item.is_void && (
                 <span className={styles.recordActions}>
+                  <Button variant="secondary" onClick={() => open(item)}>
+                    Исправить
+                  </Button>
                   <Button variant="danger" onClick={() => setVoiding(item)}>
                     Отметить ошибочным
                   </Button>
@@ -122,12 +183,14 @@ export function ClearancesCard({ dogID, active }: { dogID: number; active: boole
 
       <FormDialog
         open={draft !== null}
-        title="Новое заключение"
+        title={editing ? 'Исправить заключение' : 'Новое заключение'}
         description="Заключение строится на вашем осмотре. Для «Допущена» выберите срок и прививки-основания, действовавшие на дату осмотра."
         confirmLabel="Сохранить"
         ready={ready}
+        onReload={() => void saved()}
         onClose={() => {
           setDraft(null);
+          setEditing(null);
           setError(null);
         }}
         onSubmit={submit}
@@ -161,7 +224,7 @@ export function ClearancesCard({ dogID, active }: { dogID: number; active: boole
               label="Осмотр"
               required
               placeholder="Выберите…"
-              options={ownExams.map((item) => ({ value: item.id, label: `${formatDate(item.date)}${item.result ? ` · ${item.result}` : ''}` }))}
+              options={examOptions}
               value={draft.examination_id}
               onChange={(event) => setDraft({ ...draft, examination_id: event.target.value })}
               error={errors.examination_id}
@@ -205,6 +268,17 @@ export function ClearancesCard({ dogID, active }: { dogID: number; active: boole
               </>
             )}
             <TextArea label="Комментарий" maxLength={4000} value={draft.comment} onChange={(event) => setDraft({ ...draft, comment: event.target.value })} error={errors.comment} />
+            {editing && (
+              <TextArea
+                label="Причина исправления"
+                required
+                maxLength={MAX_REASON}
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                error={errors.reason}
+                hint="Сохранится в ветеринарной истории."
+              />
+            )}
           </>
         )}
       </FormDialog>

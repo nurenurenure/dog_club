@@ -1,4 +1,6 @@
 import { CircleCheck } from 'lucide-react';
+import { Link } from 'react-router';
+import { useSession } from '../../auth/AuthProvider';
 import { formatDate, formatDateTime } from '../../shared/format';
 import { Button, Card, Chip, EmptyState, Fact, Facts, Loading, QueryError, Timeline, tableStyles } from '../../shared/ui';
 import { decisions, reasons as medicalReasons } from '../veterinary/labels';
@@ -19,9 +21,14 @@ export function entryName(registration: Registration): string {
   return registration.participant?.full_name ?? `участник №${registration.member_id}`;
 }
 
-/** The current check or the snapshot saved at attendance: reasons, age date, medicine. */
-export function EligibilityPanel({ check, event, heading, note }: { check: Eligibility; event: Event; heading: string; note?: string }) {
+/**
+ * The current check or the snapshot saved at attendance: reasons, age date, medicine.
+ * On the current check staff gets a way to the dog card where a reason can be fixed.
+ */
+export function EligibilityPanel({ check, event, heading, note, live }: { check: Eligibility; event: Event; heading: string; note?: string; live?: boolean }) {
+  const { profile } = useSession();
   const passed = check.blocking_reasons.length === 0;
+  const fixable = live && profile.role === 'staff' && check.dog;
   const medical = check.medical;
   return (
     <Card heading={heading}>
@@ -33,7 +40,15 @@ export function EligibilityPanel({ check, event, heading, note }: { check: Eligi
       ) : (
         <ul className={styles.reasons} aria-label="Причины">
           {check.blocking_reasons.map((code) => (
-            <li key={code}>{blockingReasons[code]}</li>
+            <li key={code}>
+              {blockingReasons[code]}
+              {fixable && code === 'pedigree_incomplete' && (
+                <>
+                  {' · '}
+                  <Link to={`/dogs/${check.dog!.id}?tab=pedigree`}>Заполнить родословную</Link>
+                </>
+              )}
+            </li>
           ))}
         </ul>
       )}

@@ -125,6 +125,8 @@ export const vetApi = {
   voidVaccination: (dogID: number, id: number, version: number, reason: string) =>
     call(api.POST('/api/v1/dogs/{dogID}/vaccinations/{vaccinationID}/void', { params: { path: { dogID, vaccinationID: id } }, body: { version, reason } })),
   addClearance: (dogID: number, body: Schemas['MedicalClearanceInput']) => call(api.POST('/api/v1/dogs/{dogID}/clearances', { params: { path: { dogID } }, body })),
+  correctClearance: (dogID: number, id: number, body: Schemas['MedicalClearanceUpdate']) =>
+    call(api.PUT('/api/v1/dogs/{dogID}/clearances/{clearanceID}', { params: { path: { dogID, clearanceID: id } }, body })),
   voidClearance: (dogID: number, id: number, version: number, reason: string) =>
     call(api.POST('/api/v1/dogs/{dogID}/clearances/{clearanceID}/void', { params: { path: { dogID, clearanceID: id } }, body: { version, reason } })),
   addVaccineType: (body: Schemas['MedicalVaccineTypeInput']) => call(api.POST('/api/v1/vaccine-types', { body })),

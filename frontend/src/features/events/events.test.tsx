@@ -190,10 +190,28 @@ describe('events', () => {
     renderApp('/events/8/registrations/21');
     const panel = (await screen.findByText('Текущая проверка')).closest('section') ?? document.body;
     expect(within(panel as HTMLElement).getByText('Собака не на учёте')).toBeTruthy();
-    expect(within(panel as HTMLElement).getByText('Родословная не известна на три поколения')).toBeTruthy();
+    expect(within(panel as HTMLElement).getByText(/Родословная не известна на три поколения/)).toBeTruthy();
+    expect(
+      within(panel as HTMLElement)
+        .getByRole('link', { name: 'Заполнить родословную' })
+        .getAttribute('href'),
+    ).toBe('/dogs/7?tab=pedigree');
     expect(screen.getByText('Известна не полностью')).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Отметить явку' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText('Явку можно отметить, когда пройдены все проверки допуска.')).toBeTruthy();
+  });
+
+  it('leaves the pedigree link to staff only', async () => {
+    mockFetch({
+      'POST /api/v1/auth/refresh': () => json(credentialsFor('leader')),
+      'GET /api/v1/events/8': () => json(event()),
+      'GET /api/v1/events/8/registrations/21': () => json(registration({ eligibility: check({ blocking_reasons: ['pedigree_incomplete'] }) })),
+      'GET /api/v1/events/8/registrations/21/history': empty,
+      'GET /api/v1/events/8/results': empty,
+    });
+    renderApp('/events/8/registrations/21');
+    expect(await screen.findByText(/Родословная не известна на три поколения/)).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Заполнить родословную' })).toBeNull();
   });
 
   it('lets the assigned expert record a result of an attended dog', async () => {

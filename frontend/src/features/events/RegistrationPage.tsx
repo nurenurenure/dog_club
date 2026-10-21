@@ -60,6 +60,7 @@ function RegistrationCard({ event, registration, onReload }: { event: Event; reg
           event={event}
           heading="Текущая проверка"
           note="Пересчитывается при каждом открытии; запись сама по себе не означает допуск."
+          live
         />
       ) : null}
       {klass?.requires_expert && <QualificationCard event={event} registration={registration} onReload={onReload} />}

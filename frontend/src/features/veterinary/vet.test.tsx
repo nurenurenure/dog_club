@@ -143,6 +143,56 @@ describe('veterinary', () => {
     expect(screen.queryByText(/новый осмотр внести нельзя/)).toBeNull();
   });
 
+  it('corrects an own clearance with a reason and leaves others to their authors', async () => {
+    const clearance = (id: number, userID: string): Schemas['MedicalClearance'] => ({
+      id,
+      dog_id: 7,
+      purpose: 'events',
+      decision: 'allowed',
+      examination_id: 41,
+      examination_date: '2026-03-12',
+      valid_until: '2027-03-12',
+      vaccination_ids: [31],
+      comment: 'Здорова',
+      is_void: false,
+      author: author(userID),
+      version: 2,
+    });
+    const { calls } = mockFetch({
+      'POST /api/v1/auth/refresh': () => json(credentialsFor('veterinarian')),
+      'GET /api/v1/veterinary/dogs': () => json({ dogs: [patient], next_after: null }),
+      ...clinical([vaccination()], [examination(staffCredentials.user.id)]),
+      'GET /api/v1/dogs/7/clearances': () => page([clearance(5, staffCredentials.user.id), clearance(6, 'other-vet')]),
+      'PUT /api/v1/dogs/7/clearances/5': () => json({ ...clearance(5, staffCredentials.user.id), decision: 'denied', valid_until: null, vaccination_ids: [], version: 3 }),
+    });
+    renderApp('/patients/7');
+    const card = (await screen.findByRole('heading', { name: /Заключения о допуске/ })).closest('section')!;
+    // Only the own clearance offers a correction; the other vet's one stays read only.
+    await waitFor(() => expect(within(card).getAllByRole('listitem')).toHaveLength(2));
+    const fix = within(card).getAllByRole('button', { name: 'Исправить' });
+    expect(fix).toHaveLength(1);
+    await userEvent.click(fix[0]!);
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: 'Исправить заключение' })).toBeTruthy();
+    expect((within(dialog).getByLabelText('Осмотр') as HTMLSelectElement).value).toBe('41');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Решение'), 'denied');
+    expect(within(dialog).getByRole('button', { name: 'Сохранить' }).hasAttribute('disabled')).toBe(true);
+    await userEvent.type(within(dialog).getByLabelText('Причина исправления'), 'Ошибка в решении');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(calls.some((call) => call.method === 'PUT')).toBe(true));
+    const body = await calls.find((call) => call.method === 'PUT')!.json();
+    expect(body).toEqual({
+      purpose: 'events',
+      examination_id: 41,
+      comment: 'Здорова',
+      decision: 'denied',
+      valid_until: null,
+      vaccination_ids: [],
+      version: 2,
+      reason: 'Ошибка в решении',
+    });
+  });
+
   it('reports a missing patient', async () => {
     mockFetch({
       'POST /api/v1/auth/refresh': () => json(credentialsFor('veterinarian')),
