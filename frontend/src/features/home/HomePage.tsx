@@ -8,6 +8,7 @@ import { useRequests } from '../breeding/breedingApi';
 import { DogName } from '../breeding/parts';
 import { DocumentStatus } from '../documents/parts';
 import { useDocuments } from '../documents/documentsApi';
+import { DogPhoto } from '../dogs/DogPhoto';
 import { DogStatusChip } from '../dogs/DogStatusChip';
 import { useDogs, type DogSummary } from '../dogs/dogsApi';
 import { useEvents, type Event } from '../events/eventsApi';
@@ -145,6 +146,7 @@ function DogTile({ dog }: { dog: DogSummary }) {
   const events = status.data?.events;
   return (
     <Link to={`/dogs/${dog.id}`} className={styles.tile}>
+      <DogPhoto dogID={dog.id} nickname={dog.nickname} iconSize={48} className={styles.tilePhoto} />
       <span className={styles.nickname}>{dog.nickname}</span>
       <span className={styles.meta}>
         {dog.breed.name} · {dog.sex.name}

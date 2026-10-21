@@ -40,7 +40,13 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
 }
 
 /** Sends a multipart form and returns the parsed JSON answer. */
-export async function postForm<T>(path: string, form: FormData): Promise<T> {
-  const response = await checked(new Request(new URL(path, window.location.origin), { method: 'POST', body: form }));
+export async function postForm<T>(path: string, form: FormData, method: 'POST' | 'PUT' = 'POST'): Promise<T> {
+  const response = await checked(new Request(new URL(path, window.location.origin), { method, body: form }));
   return (await response.json()) as T;
+}
+
+/** Reads an API file into memory, e.g. an image shown on the page. */
+export async function fetchBlob(path: string): Promise<Blob> {
+  const response = await checked(new Request(new URL(path, window.location.origin)));
+  return response.blob();
 }

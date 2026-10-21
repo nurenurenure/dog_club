@@ -5,6 +5,7 @@ import { useSession } from '../../auth/AuthProvider';
 import { formatAge, formatDate } from '../../shared/format';
 import { Ball, Button, Card, Chip, EmptyState, Loading, PageHeader, QueryError, Table, Tabs, TextField, tabPanelProps, tableStyles } from '../../shared/ui';
 import { useDebounced } from '../../shared/useDebounced';
+import { DogPhoto } from '../dogs/DogPhoto';
 import { HealthTab, InactiveNote } from './HealthTab';
 import { activeByName } from './labels';
 import { VetHistory } from './VetHistory';
@@ -111,6 +112,7 @@ export function PatientPage() {
         <Link to="/patients">Пациенты</Link> / {dog.nickname}
       </nav>
       <PageHeader eyebrow={`${dog.breed.name} · ${dog.sex.name}`} title={dog.nickname} />
+      <DogPhoto dogID={dog.id} nickname={dog.nickname} iconSize={48} className={styles.patientPhoto} />
       <p className={styles.patientMeta}>
         {active ? <Chip tone="lime">{dog.status.name}</Chip> : <Chip struck>{dog.status.name}</Chip>}
         <span>

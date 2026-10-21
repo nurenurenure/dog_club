@@ -164,3 +164,12 @@
 .patientMeta b {
   font-variant-numeric: tabular-nums;
 }
+
+.patientPhoto {
+  width: 140px;
+  height: 168px;
+  border: 3px solid var(--lime);
+  border-radius: 24px;
+  background: var(--forest-deep);
+  color: var(--lime-light);
+}

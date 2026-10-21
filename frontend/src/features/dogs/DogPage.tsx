@@ -1,4 +1,3 @@
-import { Dog as DogIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useSession } from '../../auth/AuthProvider';
@@ -10,6 +9,8 @@ import { HealthTab } from '../veterinary/HealthTab';
 import { DogHistoryTab } from './DogHistoryTab';
 import { dogsApi, isActiveStatus, useDog, useDogDictionaries, useDogSaved, type Dog } from './dogsApi';
 import { OwnersTab } from './OwnersTab';
+import { DogPhoto } from './DogPhoto';
+import { PhotoControls } from './PhotoControls';
 import { PedigreeTab } from './PedigreeTab';
 import { TitlesTab } from './TitlesTab';
 import styles from './dogs.module.css';
@@ -50,9 +51,7 @@ function DogCard({ dog, onReload }: { dog: Dog; onReload: () => void }) {
           <Link to="/dogs">{profile.role === 'owner' ? 'Мои собаки' : 'Собаки'}</Link> / {dog.nickname}
         </nav>
         <div className={styles.heroBody}>
-          <div className={styles.portrait} aria-hidden="true">
-            <DogIcon size={88} strokeWidth={1.6} />
-          </div>
+          <DogPhoto dogID={dog.id} nickname={dog.nickname} iconSize={88} className={styles.portrait} />
           <div className={styles.heroText}>
             <div className={styles.heroChips}>{active ? <span className={styles.heroStatus}>{dog.status.name}</span> : <Chip struck>{dog.status.name}</Chip>}</div>
             <h1 className={styles.nickname}>{dog.nickname}</h1>
@@ -76,6 +75,7 @@ function DogCard({ dog, onReload }: { dog: Dog; onReload: () => void }) {
               <ButtonLink to={`/dogs/${dog.id}/edit`} variant="secondary" className={styles.onForest}>
                 Изменить
               </ButtonLink>
+              <PhotoControls dogID={dog.id} />
             </div>
           )}
         </div>

@@ -49,6 +49,14 @@
   text-decoration: none;
 }
 
+.tilePhoto {
+  height: 180px;
+  margin-bottom: var(--space-2);
+  border-radius: 20px;
+  background: var(--forest-deep);
+  color: var(--lime-light);
+}
+
 .tile:hover .nickname {
   text-decoration: underline;
 }

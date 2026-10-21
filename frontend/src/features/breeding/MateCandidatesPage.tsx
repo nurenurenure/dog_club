@@ -1,9 +1,9 @@
-import { Dog as DogIcon } from 'lucide-react';
 import { Link, useParams } from 'react-router';
 import { useSession } from '../../auth/AuthProvider';
 import { formatAge, formatDate } from '../../shared/format';
 import { Alert, Ball, ButtonLink, Card, EmptyState, Loading, PageHeader, QueryError } from '../../shared/ui';
 import clsx from '../../shared/ui/clsx';
+import { DogPhoto } from '../dogs/DogPhoto';
 import { useMateCandidates } from './breedingApi';
 import { DogName } from './parts';
 import styles from './breeding.module.css';
@@ -45,9 +45,7 @@ export function MateCandidatesPage() {
                 const pair = female ? `female=${dog.id}&male=${dogID}` : `female=${dogID}&male=${dog.id}`;
                 return (
                   <li key={dog.id} className={clsx(styles.story, tones[index % tones.length])}>
-                    <span className={styles.storyPhoto} aria-hidden="true">
-                      <DogIcon size={56} strokeWidth={1.6} />
-                    </span>
+                    <DogPhoto dogID={dog.id} nickname={dog.nickname} iconSize={56} className={styles.storyPhoto} />
                     <span className={styles.storyName}>{dog.nickname}</span>
                     <span>
                       {dog.breed.name} · {dog.sex.name}
