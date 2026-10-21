@@ -19,11 +19,16 @@ export class ApiError extends Error {
     return this.problem?.code;
   }
 
-  /** Optimistic-locking conflicts of every module share HTTP 409. */
+  /**
+   * Optimistic-locking conflicts of every module share HTTP 409. Accounts also answer 409
+   * for a state rule (the last administrator, a taken login): those keep their own text.
+   */
   get isConflict(): boolean {
-    return this.status === 409;
+    return this.status === 409 && !stateConflicts.has(this.code ?? '');
   }
 }
+
+const stateConflicts = new Set(['last_admin', 'account_conflict']);
 
 export function isProblem(value: unknown): value is Problem {
   if (typeof value !== 'object' || value === null) return false;
@@ -49,7 +54,7 @@ const fallback: Record<number, string> = {
 /** Human text for any thrown error; never shows raw technical details. */
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.status === 409) return fallback[409]!;
+    if (error.isConflict) return fallback[409]!;
     return error.problem?.detail ?? fallback[error.status] ?? 'Не удалось выполнить действие. Повторите позже.';
   }
   return 'Что-то пошло не так. Обновите страницу.';
