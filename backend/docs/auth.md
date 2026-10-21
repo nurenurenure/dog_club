@@ -48,7 +48,7 @@
 
 Access JWT действует 10 минут: HS256, проверяются подпись, `typ=at+jwt`, issuer,
 audience, сроки и обязательные claims. В JWT находятся ID аккаунта, сессии,
-профиля и версии; email, логин и пароль не включаются. Будущий React хранит access
+профиля и версии; email, логин и пароль не включаются. Веб-клиент хранит access
 в памяти и отправляет `Authorization: Bearer <access_token>`.
 
 Refresh — случайный непрозрачный секрет 32 байта в cookie `dogclub_refresh`:
@@ -130,8 +130,8 @@ ID профилей и действующего приглашения адми�
 вычисления паролей; перегрузка возвращает 429 с Retry-After.
 
 Изменяющие браузерные запросы защищает Go CrossOriginProtection. Иностранный
-Origin/Sec-Fetch-Site отклоняется с 403. CORS не включён: будущий React должен
-использовать один origin с API либо локальный dev proxy. CLI-запросы без Origin
+Origin/Sec-Fetch-Site отклоняется с 403. CORS не включён: веб-клиент работает
+с API на одном origin (сервис `web` или dev proxy Vite). CLI-запросы без Origin
 могут использовать API. Cookie дополняют эту проверку атрибутом SameSite=Strict.
 
 Ограничение попыток действует по реальному RemoteAddr и шаблону маршрута в одном

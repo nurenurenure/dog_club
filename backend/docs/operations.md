@@ -1,6 +1,6 @@
 # Локальная эксплуатация backend
 
-Репозиторий содержит Go API, PostgreSQL 18 и Mailpit. React-клиент не включён.
+Репозиторий содержит Go API, PostgreSQL 18, Mailpit и веб-клиент (сервис `web`).
 Развёртывание на публичном сервере, внешний SMTP, TLS, Prometheus/Grafana,
 ELK, Telegram, REST-ящик уведомлений и WebSocket не настроены.
 
