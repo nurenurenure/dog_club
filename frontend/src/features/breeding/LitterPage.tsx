@@ -55,7 +55,8 @@ function LitterCard({ litter, onReload }: { litter: Litter; onReload: () => void
   const { profile } = useSession();
   const staff = profile.role === 'staff';
   const saved = useBreedingSaved();
-  const dictionaries = useDogDictionaries();
+  // Only staff registers puppies; the expert may not read dog dictionaries at all.
+  const dictionaries = useDogDictionaries(staff);
   const [dialog, setDialog] = useState<'correct' | 'register' | 'link' | null>(null);
   const [unlinking, setUnlinking] = useState<number | null>(null);
   const [birth, setBirth] = useState(litter.date_of_birth);

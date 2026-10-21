@@ -31,9 +31,10 @@ export const dogKeys = {
 };
 
 /** Dictionaries change only with migrations: one load per session is enough. */
-export function useDogDictionaries() {
+export function useDogDictionaries(enabled = true) {
   return useQuery({
     queryKey: dogKeys.dictionaries,
+    enabled,
     queryFn: () => call(api.GET('/api/v1/dog-dictionaries')),
     staleTime: Infinity,
   });
