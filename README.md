@@ -144,7 +144,7 @@ go run ./cmd/api
 
 ## API и состояние сервиса
 
-[OpenAPI](backend/api/openapi.yaml) описывает 153 операции. Успешные ответы — JSON DTO,
+[OpenAPI](backend/api/openapi.yaml) описывает 157 операций. Успешные ответы — JSON DTO,
 ошибки — RFC 9457 (`application/problem+json`) со стабильным `code`, `request_id`
 и ошибками полей. Неизвестные поля JSON отклоняются. Ответы имеют
 `Cache-Control: no-store` и `X-Request-ID`.
