@@ -62,6 +62,8 @@ func (h *Handler) RegisterRoutes(router chi.Router) {
 				r.Get("/users", h.users)
 				r.Patch("/users/{userID}", h.blockUser)
 				r.Put("/users/{userID}/member", h.bindMember)
+				r.Get("/users/{userID}/profiles", h.userProfiles)
+				r.Get("/users/{userID}/invitation", h.userInvitation)
 				r.Post("/users/{userID}/profiles", h.addProfile)
 				r.Patch("/users/{userID}/profiles/{profileID}", h.profileState)
 				r.Post("/invitations", h.publicLimit(20, time.Minute, h.invite))
@@ -312,6 +314,24 @@ func (h *Handler) blockUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(204)
+}
+func (h *Handler) userProfiles(w http.ResponseWriter, r *http.Request) {
+	profiles, err := h.service.UserProfiles(r.Context(), PrincipalFrom(r), chi.URLParam(r, "userID"))
+	if err != nil {
+		writeAuthError(w, r, err)
+		return
+	}
+	httpapi.WriteJSON(w, 200, struct {
+		Profiles []Profile `json:"profiles"`
+	}{profiles})
+}
+func (h *Handler) userInvitation(w http.ResponseWriter, r *http.Request) {
+	i, err := h.service.UserInvitation(r.Context(), PrincipalFrom(r), chi.URLParam(r, "userID"))
+	if err != nil {
+		writeAuthError(w, r, err)
+		return
+	}
+	httpapi.WriteJSON(w, 200, i)
 }
 func (h *Handler) addProfile(w http.ResponseWriter, r *http.Request) {
 	var in struct {

@@ -5870,7 +5870,7 @@ components:
 info:
     description: Этапы 04–09 и части 1–4 этапа 10. Закрытые документы, девять документных PDF-форм и сводный отчёт в JSON/PDF/CSV без серверного архива. Права, версии, история и снимки документов; показатели за период, текущие итоги и полнота дат отчёта.
     title: Клуб собаководства — backend
-    version: 0.12.0
+    version: 0.13.0
 openapi: 3.1.1
 paths:
     /api/v1/operations/metrics:
@@ -10271,6 +10271,53 @@ paths:
             security:
                 - bearerAuth: []
             summary: Блокировка/разблокировка; старые сессии не восстанавливаются
+    /api/v1/users/{userID}/invitation:
+        get:
+            description: Требуется действующий активный профиль admin. Неиспользованное и неотменённое приглашение, в том числе истёкшее; 404, если его нет или аккаунт неизвестен. Код приглашения не возвращается.
+            operationId: getUserInvitation
+            parameters:
+                - in: path
+                  name: userID
+                  required: true
+                  schema:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Invitation'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Действующее приглашение аккаунта для повтора или отмены: admin'
     /api/v1/users/{userID}/member:
         put:
             description: Одна карточка — максимум один аккаунт. Повтор той же привязки допустим; перепривязка к другой карточке запрещена.
@@ -10323,6 +10370,52 @@ paths:
             tags:
                 - Members
     /api/v1/users/{userID}/profiles:
+        get:
+            description: Требуется действующий активный профиль admin; другие назначенные профили не дают этих прав. Включённые и отключённые профили; 404 для неизвестного аккаунта.
+            operationId: listUserProfiles
+            parameters:
+                - in: path
+                  name: userID
+                  required: true
+                  schema:
+                    maxLength: 64
+                    minLength: 1
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Profiles'
+                    description: Успешно
+                    headers:
+                        Cache-Control:
+                            $ref: '#/components/headers/NoStore'
+                        X-Request-ID:
+                            $ref: '#/components/headers/RequestID'
+                "400":
+                    $ref: '#/components/responses/BadRequest'
+                "401":
+                    $ref: '#/components/responses/AuthUnauthorized'
+                "403":
+                    $ref: '#/components/responses/AuthForbidden'
+                "404":
+                    $ref: '#/components/responses/NotFound'
+                "413":
+                    $ref: '#/components/responses/BodyTooLarge'
+                "415":
+                    $ref: '#/components/responses/UnsupportedMediaType'
+                "422":
+                    $ref: '#/components/responses/ValidationFailed'
+                "429":
+                    $ref: '#/components/responses/AuthRateLimited'
+                "500":
+                    $ref: '#/components/responses/InternalError'
+                "503":
+                    $ref: '#/components/responses/AuthUnavailable'
+            security:
+                - bearerAuth: []
+            summary: 'Все профили аккаунта: admin'
         post:
             description: Требуется действующий активный профиль admin; другие назначенные профили не дают этих прав.
             operationId: assignProfile

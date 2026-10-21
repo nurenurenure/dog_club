@@ -552,6 +552,35 @@ func (s *Service) Users(ctx context.Context, p Principal, after string, limit in
 	return s.repo.read().users(ctx, after, limit)
 }
 
+// UserProfiles lists every profile of an account, enabled or not, for the administrator.
+func (s *Service) UserProfiles(ctx context.Context, p Principal, userID string) ([]Profile, error) {
+	if err := RequireProfile(p, "admin"); err != nil {
+		return nil, err
+	}
+	if len(userID) > 64 {
+		return nil, ErrInvalidInput
+	}
+	ctx, cancel := s.scope(ctx)
+	defer cancel()
+	q := s.repo.read()
+	if _, err := q.user(ctx, userID); err != nil {
+		return nil, err
+	}
+	return q.profiles(ctx, userID)
+}
+
+// UserInvitation is the pending invitation of an account, so the administrator can resend or cancel it.
+func (s *Service) UserInvitation(ctx context.Context, p Principal, userID string) (Invitation, error) {
+	if err := RequireProfile(p, "admin"); err != nil {
+		return Invitation{}, err
+	}
+	if len(userID) > 64 {
+		return Invitation{}, ErrInvalidInput
+	}
+	ctx, cancel := s.scope(ctx)
+	defer cancel()
+	return s.repo.read().pendingInvitation(ctx, userID)
+}
 func (s *Service) AddProfile(ctx context.Context, p Principal, userID, role string) (Profile, error) {
 	if !validRole(role) {
 		return Profile{}, ErrInvalidInput

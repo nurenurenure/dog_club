@@ -175,6 +175,11 @@ func (q *queries) invitation(ctx context.Context, id string) (Invitation, User, 
 	u, err := q.user(ctx, i.UserID)
 	return i, u, err
 }
+func (q *queries) pendingInvitation(ctx context.Context, userID string) (Invitation, error) {
+	var i Invitation
+	err := q.db.QueryRow(ctx, `SELECT invitation_id,user_id,expires_at FROM auth_invitations WHERE user_id=$1 AND revoked_at IS NULL AND used_at IS NULL ORDER BY expires_at DESC LIMIT 1`, userID).Scan(&i.ID, &i.UserID, &i.ExpiresAt)
+	return i, storageError(err)
+}
 func (q *queries) addInvitation(ctx context.Context, userID, secret string, now time.Time) (Invitation, error) {
 	if err := q.revokeInvitations(ctx, userID); err != nil {
 		return Invitation{}, err

@@ -437,3 +437,75 @@ func TestPostgresAccountAndProfileLifecycle(t *testing.T) {
 	_, err = s.Authenticate(ctx, active.AccessToken)
 	expect(err, ErrUnavailable)
 }
+
+func TestPostgresAdminReadsAccountAccess(t *testing.T) {
+	ctx, pool, _ := isolatedAuthDB(t)
+	mail := new(recordedMail)
+	s, err := NewService(NewRepository(pool), mail, Options{JWTKey: []byte(strings.Repeat("k", 32)), Issuer: "integration", Audience: "dogclub", IOTimeout: 5 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	password := "Integration password 12345!"
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	expect := func(err, want error) {
+		t.Helper()
+		if !errors.Is(err, want) {
+			t.Fatalf("expected %v, got %v", want, err)
+		}
+	}
+	_, err = s.Bootstrap(ctx, "admin", "admin@integration.test")
+	must(err)
+	must(s.Activate(ctx, mail.code(t), password))
+	credentials, err := s.Login(ctx, "admin", password, "")
+	must(err)
+	admin, err := s.Authenticate(ctx, credentials.AccessToken)
+	must(err)
+
+	// After a reload the administrator finds the pending invitation and every profile again.
+	first, err := s.Invite(ctx, admin, InviteInput{Login: "boris", Email: "boris@integration.test", Role: "owner"})
+	must(err)
+	pending, err := s.UserInvitation(ctx, admin, first.UserID)
+	must(err)
+	if pending.ID != first.ID {
+		t.Fatal("pending invitation not found")
+	}
+	vet, err := s.AddProfile(ctx, admin, first.UserID, "veterinarian")
+	must(err)
+	must(s.SetProfileEnabled(ctx, admin, first.UserID, vet.ID, false))
+	profiles, err := s.UserProfiles(ctx, admin, first.UserID)
+	must(err)
+	if len(profiles) != 2 || profiles[0].Role != "owner" || profiles[1].ID != vet.ID || profiles[1].Enabled {
+		t.Fatalf("unexpected profiles %+v", profiles)
+	}
+
+	// A resend replaces the invitation; activation leaves none pending.
+	second, err := s.ResendInvitation(ctx, admin, first.ID)
+	must(err)
+	pending, err = s.UserInvitation(ctx, admin, first.UserID)
+	must(err)
+	if pending.ID != second.ID {
+		t.Fatal("resent invitation not returned")
+	}
+	must(s.Activate(ctx, mail.code(t), password))
+	_, err = s.UserInvitation(ctx, admin, first.UserID)
+	expect(err, ErrNotFound)
+
+	// Unknown accounts are hidden; other profiles of the same person get nothing.
+	_, err = s.UserProfiles(ctx, admin, "missing-user")
+	expect(err, ErrNotFound)
+	_, err = s.UserInvitation(ctx, admin, strings.Repeat("x", 65))
+	expect(err, ErrInvalidInput)
+	ownerCredentials, err := s.Login(ctx, "boris", password, "")
+	must(err)
+	owner, err := s.Authenticate(ctx, ownerCredentials.AccessToken)
+	must(err)
+	_, err = s.UserProfiles(ctx, owner, admin.User.ID)
+	expect(err, ErrForbidden)
+	_, err = s.UserInvitation(ctx, owner, admin.User.ID)
+	expect(err, ErrForbidden)
+}
