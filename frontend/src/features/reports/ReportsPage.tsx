@@ -10,12 +10,12 @@ import { formatDate, formatDateTime, todayUTC } from '../../shared/format';
 import { Alert, Button, Card, Fact, Facts, Loading, PageHeader, QueryError, Table, TextField, fieldStyles } from '../../shared/ui';
 import styles from './reports.module.css';
 
-interface Period {
+export interface Period {
   from: string;
   to: string;
 }
 
-function useReport(period: Period | null) {
+export function useReport(period: Period | null) {
   return useQuery({
     queryKey: ['reports', 'club-activity', period],
     enabled: period !== null,

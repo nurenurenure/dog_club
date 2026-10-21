@@ -8,6 +8,7 @@ import { BreedingRoutes } from '../features/breeding/BreedingRoutes';
 import { DocumentsRoutes } from '../features/documents/DocumentsRoutes';
 import { DogsRoutes } from '../features/dogs/DogsRoutes';
 import { EventsRoutes } from '../features/events/EventsRoutes';
+import { HomePage } from '../features/home/HomePage';
 import { OwnCardPage } from '../features/members/MemberPage';
 import { MembersRoutes } from '../features/members/MembersRoutes';
 import { ReportsPage } from '../features/reports/ReportsPage';
@@ -43,8 +44,9 @@ function RoleSection({ section, children }: { section: SectionKey; children?: Re
   return <>{children ?? <SectionPlaceholder section={section} />}</>;
 }
 
-// Sections built so far; the rest show a placeholder with the step of the plan.
+// Every section of the menu has its screen; a new section shows a placeholder until it gets one.
 const screens: Partial<Record<SectionKey, React.ReactNode>> = {
+  home: <HomePage />,
   dogs: <DogsRoutes />,
   members: <MembersRoutes />,
   card: <OwnCardPage />,

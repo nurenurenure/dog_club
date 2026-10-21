@@ -1,0 +1,85 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: 12px 0;
+}
+
+.row + .row {
+  border-top: var(--border);
+}
+
+.rowBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.meta {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.dogs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: var(--space-4);
+}
+
+/* Dog tiles echo the forest hero of the dog card. */
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-5);
+  border-radius: var(--radius-card);
+  background: var(--forest);
+  color: var(--cream);
+  text-decoration: none;
+}
+
+.tile:hover .nickname {
+  text-decoration: underline;
+}
+
+.tile .meta {
+  color: var(--lime-soft);
+}
+
+.nickname {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 40px;
+  line-height: 0.95;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.gaps {
+  margin: 0;
+  padding-left: 18px;
+}
