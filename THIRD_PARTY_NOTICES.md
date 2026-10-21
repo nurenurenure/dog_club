@@ -268,3 +268,10 @@ $Id$
 Фото на экране входа (`frontend/src/assets/login-hero.jpg`) — Karsten Winegeart,
 [Unsplash](https://unsplash.com/photos/french-bulldog-in-green-vest-BJaqPaH6AGQ),
 по [Unsplash License](https://unsplash.com/license); уменьшено до 734×1100.
+
+Демо-фото собак (`scripts/demo-photos/`) — [Unsplash](https://unsplash.com) по
+[Unsplash License](https://unsplash.com/license), уменьшены до 600×900:
+
+- `beagle.jpg` — Jabez Rodarte, https://unsplash.com/photos/a-close-up-of-a-dog-looking-at-the-camera-rxFw2zAaUi0;
+- `german-shepherd.jpg` — Shayna Douglas, https://unsplash.com/photos/black-and-tan-german-shepherd-zXSUd0xYl1Q;
+- `labrador.jpg` — Noémi Macavei-Katócz, https://unsplash.com/photos/adult-yellow-labrador-retriever-c7bUIRBqapA.

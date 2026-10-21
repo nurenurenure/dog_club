@@ -23,6 +23,8 @@ ROOT = Path(__file__).resolve().parent.parent
 TZ = 'Asia/Barnaul'
 TODAY = dt.datetime.now(dt.timezone.utc).date()
 HTTP = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+# Unsplash photos (Unsplash License), credited in THIRD_PARTY_NOTICES.md.
+PHOTOS = Path(__file__).resolve().parent / 'demo-photos'
 
 
 class DemoError(SystemExit):
@@ -50,7 +52,7 @@ def compose(*args):
     return result.stdout.strip()
 
 
-def request(url, method='GET', body=None, token=None, want=(200,)):
+def request(url, method='GET', body=None, token=None, want=(200,), raw=None):
     headers = {'Accept': 'application/json'}
     data = None
     if token:
@@ -58,6 +60,8 @@ def request(url, method='GET', body=None, token=None, want=(200,)):
     if body is not None:
         headers['Content-Type'] = 'application/json'
         data = json.dumps(body).encode()
+    if raw is not None:
+        data, headers['Content-Type'] = raw
     for attempt in range(4):
         req = urllib.request.Request(url, data=data, method=method, headers=headers)
         try:
@@ -107,6 +111,16 @@ class Client:
 
     def patch(self, path, body):
         return self.call('PATCH', path, body)
+
+    def photo(self, dog, name):
+        # One JPEG from scripts/demo-photos as multipart: file and version 0 (no photo yet).
+        data = (PHOTOS / name).read_bytes()
+        boundary = 'demo' + secrets.token_hex(12)
+        body = (f'--{boundary}\r\nContent-Disposition: form-data; name="version"\r\n\r\n0\r\n'
+                f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{name}"\r\n'
+                f'Content-Type: image/jpeg\r\n\r\n').encode() + data + f'\r\n--{boundary}--\r\n'.encode()
+        raw = (body, 'multipart/form-data; boundary=' + boundary)
+        return request(self.base + '/api/v1' + f'/dogs/{dog["id"]}/photo', 'PUT', token=self.token, raw=raw)
 
 
 class Mailpit:
@@ -280,6 +294,10 @@ def main():
     for old in grand[:2]:
         set_status(old, 'Снята с учёта')
     richie, alma, lord = registered(richie, -700), registered(alma, -650), registered(lord, -900)
+
+    print('Photos', flush=True)
+    for d, name in [(richie, 'labrador.jpg'), (bublik, 'beagle.jpg'), (irma, 'german-shepherd.jpg')]:
+        staff.photo(d, name)
 
     print('Veterinary records', flush=True)
     rabies = vet.post('/vaccine-types', {'name': 'Антирабическая вакцина (демо)', 'maker': 'Демо-производитель',
