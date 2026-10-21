@@ -1,24 +1,8 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
-import { navItem, roleLabels, sections, type SectionKey } from '../../app/navigation';
+import { roleLabels } from '../../app/navigation';
 import { useSession } from '../../auth/AuthProvider';
 import { Alert, Bone, Card, EmptyState, PageHeader } from '../../shared/ui';
-
-/** Temporary screen for sections whose step of the frontend plan is still ahead. */
-export function SectionPlaceholder({ section }: { section: SectionKey }) {
-  const { profile } = useSession();
-  const item = navItem(profile.role, section);
-  return (
-    <>
-      <PageHeader eyebrow={roleLabels[profile.role]} title={item?.label ?? 'Раздел'} />
-      <Card>
-        <EmptyState title="Раздел появится в следующих шагах" illustration={<Bone />}>
-          <p>Экран строится на шаге {sections[section].step} плана фронтенда. Меню и права профиля уже работают.</p>
-        </EmptyState>
-      </Card>
-    </>
-  );
-}
 
 /** Shown when the active profile has no such section: profiles never combine rights. */
 export function NoAccess() {

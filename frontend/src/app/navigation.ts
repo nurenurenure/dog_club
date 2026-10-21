@@ -36,25 +36,23 @@ export type SectionKey =
 export interface Section {
   path: string;
   icon: LucideIcon;
-  /** Step of the frontend plan where the screen is implemented. */
-  step: number;
 }
 
 export const sections: Record<SectionKey, Section> = {
-  home: { path: '/', icon: Home, step: 8 },
-  members: { path: '/members', icon: Users, step: 3 },
-  dogs: { path: '/dogs', icon: Dog, step: 3 },
-  breeding: { path: '/breeding', icon: HeartHandshake, step: 5 },
-  events: { path: '/events', icon: CalendarDays, step: 6 },
-  training: { path: '/training', icon: GraduationCap, step: 7 },
-  documents: { path: '/documents', icon: FileText, step: 7 },
-  reports: { path: '/reports', icon: BarChart3, step: 7 },
-  card: { path: '/me', icon: IdCard, step: 3 },
-  patients: { path: '/patients', icon: Stethoscope, step: 4 },
-  vaccines: { path: '/vaccines', icon: Syringe, step: 4 },
-  users: { path: '/admin/users', icon: ClipboardList, step: 8 },
-  instructors: { path: '/admin/instructors', icon: ShieldCheck, step: 8 },
-  system: { path: '/admin/system', icon: Activity, step: 8 },
+  home: { path: '/', icon: Home },
+  members: { path: '/members', icon: Users },
+  dogs: { path: '/dogs', icon: Dog },
+  breeding: { path: '/breeding', icon: HeartHandshake },
+  events: { path: '/events', icon: CalendarDays },
+  training: { path: '/training', icon: GraduationCap },
+  documents: { path: '/documents', icon: FileText },
+  reports: { path: '/reports', icon: BarChart3 },
+  card: { path: '/me', icon: IdCard },
+  patients: { path: '/patients', icon: Stethoscope },
+  vaccines: { path: '/vaccines', icon: Syringe },
+  users: { path: '/admin/users', icon: ClipboardList },
+  instructors: { path: '/admin/instructors', icon: ShieldCheck },
+  system: { path: '/admin/system', icon: Activity },
 };
 
 export interface NavItem {

@@ -16,7 +16,7 @@ import { TrainingRoutes } from '../features/training/TrainingRoutes';
 import { PatientsRoutes } from '../features/veterinary/PatientsRoutes';
 import { VaccinesPage } from '../features/veterinary/VaccinesPage';
 import { LoginPage, type LoginNotice } from '../features/auth/LoginPage';
-import { NoAccess, NotFound, SectionPlaceholder } from '../features/sections/SectionPage';
+import { NoAccess, NotFound } from '../features/sections/SectionPage';
 import { Shell } from '../shared/layout/Shell';
 import { Loading } from '../shared/ui';
 import { homePath, navItem, sections, type SectionKey } from './navigation';
@@ -34,7 +34,7 @@ function RequireAuth() {
 }
 
 /** A section opens only when the active profile's menu contains it. */
-function RoleSection({ section, children }: { section: SectionKey; children?: React.ReactNode }) {
+function RoleSection({ section, children }: { section: SectionKey; children: React.ReactNode }) {
   const { credentials } = useAuth();
   if (!credentials) return null;
   const role = credentials.profile.role;
@@ -42,11 +42,11 @@ function RoleSection({ section, children }: { section: SectionKey; children?: Re
     // «/» is the dashboard of owner/staff/leader; other roles start elsewhere.
     return section === 'home' ? <Navigate to={homePath(role)} replace /> : <NoAccess />;
   }
-  return <>{children ?? <SectionPlaceholder section={section} />}</>;
+  return <>{children}</>;
 }
 
-// Every section of the menu has its screen; a new section shows a placeholder until it gets one.
-const screens: Partial<Record<SectionKey, React.ReactNode>> = {
+// Every section of the menu has its screen: the full record makes a missing one a type error.
+const screens: Record<SectionKey, React.ReactNode> = {
   home: <HomePage />,
   dogs: <DogsRoutes />,
   members: <MembersRoutes />,
