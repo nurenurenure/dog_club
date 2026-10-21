@@ -1,5 +1,5 @@
 import '@testing-library/dom';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
 // jsdom has no modal dialogs; enough to make <dialog> contents visible to queries.
@@ -12,6 +12,9 @@ if (typeof HTMLDialogElement !== 'undefined') {
     this.dispatchEvent(new Event('close'));
   };
 }
+
+// findBy… waits 1 s by default; a full parallel run on a busy machine needs more.
+configure({ asyncUtilTimeout: 3000 });
 
 afterEach(() => {
   cleanup();
