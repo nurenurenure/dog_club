@@ -30,7 +30,10 @@ async function send(request: Request): Promise<Response> {
 
 let rechecking: Promise<void> | null = null;
 
-/** Re-reads the account and the current profile: the administrator may have linked a member card meanwhile. */
+/**
+ * Re-reads the account and the current profile. A 403 may mean the administrator
+ * disabled this profile or linked a member card meanwhile; the shell then explains it.
+ */
 export function reloadAccount(): Promise<void> {
   rechecking ??= readAccount()
     .catch(() => undefined)
@@ -53,11 +56,15 @@ async function readAccount(): Promise<void> {
   setSession({ ...now, user: me.user, profile: me.profile });
 }
 
-/** Adds the bearer token; on 401 refreshes once and repeats the request. */
+/** Adds the bearer token; on 401 refreshes once and repeats the request, on 403 rechecks the account. */
 export async function authFetch(request: Request): Promise<Response> {
   const retry = request.clone();
   const response = await send(withToken(request));
-  if (response.status !== 401 || isAnonymous(request.url) || !getSession()) {
+  if (isAnonymous(request.url) || !getSession()) {
+    return response;
+  }
+  if (response.status === 403) void reloadAccount();
+  if (response.status !== 401) {
     return response;
   }
   const fresh = await refreshSession();
