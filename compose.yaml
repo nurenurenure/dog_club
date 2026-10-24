@@ -75,6 +75,26 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
       target: checks
+  e2e:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: e2e
+    environment:
+      E2E_BASE_URL: http://web:8080
+      E2E_ACCOUNTS: /out/accounts.txt
+      E2E_OUT: /out
+      MAILPIT_URL: http://mailpit:8025
+    volumes:
+      - ./frontend/e2e:/src/frontend/e2e
+      - ./frontend/playwright.config.ts:/src/frontend/playwright.config.ts:ro
+      - ./var/e2e:/out
+    # Chromium needs more shared memory than Docker's 64 MB default.
+    shm_size: 1gb
+    depends_on:
+      web:
+        condition: service_started
   mailpit:
     image: axllent/mailpit:v1.31.6
     ports:

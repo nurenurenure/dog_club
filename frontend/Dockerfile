@@ -20,3 +20,12 @@ FROM nginxinc/nginx-unprivileged:1.28.0-alpine AS runtime
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /src/frontend/dist /usr/share/nginx/html
 EXPOSE 8080
+
+# Browser tests: Playwright with its pinned browsers. Tests and config are mounted
+# at run time (scripts/e2e.py), so updated screenshots land back in the repository.
+FROM mcr.microsoft.com/playwright:v1.63.0-noble AS e2e
+WORKDIR /src/frontend
+RUN npm install -g npm@11.19.1
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+ENTRYPOINT ["npx", "playwright", "test"]

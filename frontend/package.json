@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "typecheck": "npm run api:types && tsc",
     "test": "npm run api:types && vitest run",
-    "api:types": "openapi-typescript ../backend/api/openapi.yaml -o src/api/schema.d.ts"
+    "api:types": "openapi-typescript ../backend/api/openapi.yaml -o src/api/schema.d.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@fontsource/fira-sans-extra-condensed": "5.1.0",
@@ -26,6 +27,7 @@
     "react-router": "7.18.2"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@testing-library/dom": "10.4.0",
     "@testing-library/react": "16.0.1",
     "@testing-library/user-event": "14.5.2",
