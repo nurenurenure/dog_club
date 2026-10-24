@@ -1,9 +1,6 @@
 .env
 .env.*
 !.env.example
-/context/sources/
-/context/reference/
-/ai_context/
 *.pdf
 .DS_Store
 .idea/
