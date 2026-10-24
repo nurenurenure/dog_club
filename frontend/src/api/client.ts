@@ -1,8 +1,8 @@
 import createClient from 'openapi-fetch';
 import { ApiError, toApiError } from './problem';
 import { refreshSession } from './refresh';
-import type { paths } from './schema';
-import { getSession } from './session';
+import type { components, paths } from './schema';
+import { getSession, setSession } from './session';
 
 // Endpoints that never carry a bearer token or must not trigger a refresh retry.
 const anonymous = ['/auth/login', '/auth/refresh', '/auth/activate', '/auth/forgot-password', '/auth/reset-password'];
@@ -26,6 +26,31 @@ async function send(request: Request): Promise<Response> {
   } catch {
     throw toApiError(0, null);
   }
+}
+
+let rechecking: Promise<void> | null = null;
+
+/** Re-reads the account and the current profile: the administrator may have linked a member card meanwhile. */
+export function reloadAccount(): Promise<void> {
+  rechecking ??= readAccount()
+    .catch(() => undefined)
+    .finally(() => {
+      rechecking = null;
+    });
+  return rechecking;
+}
+
+async function readAccount(): Promise<void> {
+  const before = getSession();
+  if (!before) return;
+  const response = await send(withToken(new Request(new URL('/api/v1/auth/me', window.location.origin))));
+  if (!response.ok) return;
+  const me = (await response.json()) as components['schemas']['Principal'];
+  const now = getSession();
+  // A sign-out or another profile may have taken over meanwhile.
+  if (!now || now !== before || me.user.id !== now.user.id || me.profile.id !== now.profile.id) return;
+  if (me.profile.enabled === now.profile.enabled && me.user.club_member_id === now.user.club_member_id) return;
+  setSession({ ...now, user: me.user, profile: me.profile });
 }
 
 /** Adds the bearer token; on 401 refreshes once and repeats the request. */

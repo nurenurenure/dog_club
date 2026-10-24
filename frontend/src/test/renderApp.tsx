@@ -19,6 +19,8 @@ export function renderApp(path: string) {
   return router;
 }
 
+/** An owner works through a linked member card; the other roles need none. */
 export function credentialsFor(role: Role) {
-  return { ...staffCredentials, profile: { id: `p-${role}`, role, enabled: true } };
+  const user = role === 'owner' ? { ...staffCredentials.user, club_member_id: 3 } : staffCredentials.user;
+  return { ...staffCredentials, user, profile: { id: `p-${role}`, role, enabled: true } };
 }

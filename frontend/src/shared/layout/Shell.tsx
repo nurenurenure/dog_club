@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { homePath, navByRole, sections } from '../../app/navigation';
 import { useSession } from '../../auth/AuthProvider';
 import { Stamp } from '../ui';
+import { AccessNotice, useAccessBlock } from './AccessNotice';
 import { ProfileSwitcher } from './ProfileSwitcher';
 import styles from './Shell.module.css';
 
@@ -12,6 +13,7 @@ const BOTTOM_ITEMS = 4;
 /** Sidebar on desktop; top bar and a bottom bar of four items (+ «Ещё») on phones. */
 export function Shell() {
   const { profile } = useSession();
+  const block = useAccessBlock();
   const items = navByRole[profile.role];
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -55,7 +57,7 @@ export function Shell() {
           <ProfileSwitcher placement="topbar" />
         </header>
         <main className={styles.content} id="main">
-          <Outlet />
+          {block ? <AccessNotice block={block} /> : <Outlet />}
         </main>
       </div>
 
