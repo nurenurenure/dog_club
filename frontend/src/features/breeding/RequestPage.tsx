@@ -130,7 +130,7 @@ function RequestCard({ request, onReload }: { request: BreedingRequest; onReload
         />
       </Facts>
       {request.comment && <Alert tone="info">{request.comment}</Alert>}
-      {expert && request.status === 'pending' && blocked && <Alert tone="error">Одобрение недоступно, пока есть блокирующие причины.</Alert>}
+      {expert && request.status === 'pending' && blocked && <Alert tone="warning">Одобрение недоступно, пока есть блокирующие причины.</Alert>}
       {staff && request.status === 'approved' && open && request.planned_date > today && (
         <p className={styles.note}>Провести вязку можно в одобренную дату {formatDate(request.planned_date)}: фактическая дата не бывает в будущем.</p>
       )}
